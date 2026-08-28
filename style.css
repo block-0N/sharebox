@@ -58,7 +58,6 @@ main {
     margin: 4px 0;
     border: 1px solid #eee;
     border-radius: 6px;
-    margin-left: 16px;
 }
 
 input,
@@ -108,4 +107,9 @@ input[type="file"] {
     padding: 10px;
     color: #666;
     text-align: center;
+}
+
+[data-depth] {
+    --indent: calc(var(--depth, 0) * 16px);
+    margin-left: var(--indent);
 }

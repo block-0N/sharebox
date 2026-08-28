@@ -333,7 +333,13 @@ async function loadFiles() {
         addToTree(item.file_name, { ...item, displayName: item.file_name.split('/').pop() });
     });
     let folderIdCounter = 0;
-    // 递归渲染树HTML
+    /**
+     * 递归渲染树HTML
+     * @param {TreeNode} node 
+     * @param {string} parentPath 
+     * @param {number} depth 
+     * @returns {string}
+     */
     function renderTree(node, parentPath = "", depth = 0) {
         let html = "";
         // 遍历子文件夹
@@ -342,28 +348,21 @@ async function loadFiles() {
             const fid = 'folder-tree-' + folderIdCounter++;
             const fullPath = parentPath ? `${parentPath}/${folderName}` : folderName;
             const childHtml = renderTree(folderNode, fullPath, depth + 1);
-            const fileHtml = Object.values(folderNode._files).map(file => `
-                <div class="file-item">
-                    <a href="${file.file_url}" target="_blank">${file.displayName}</a>
-                    <button onclick="downloadFile('${file.displayName}','${file.file_url}')">下载</button>
-                    <button class="del" onclick="delFile('${file.id}','${file.storage_path}')">删除</button>
-                </div>`).join("");
             html += `
-            <div class="folder">
+            <div class="folder" data-depth="${depth}">
                 <div class="folder-item file-item" onclick="toggleFolder('${fid}')">
                     <span>📁 ${folderName}</span>
-                    <button onclick="event.stopPropagation();downloadFolderZip('${fullPath}')">下载</button>
+                    <button onclick="event.stopPropagation();downloadFolderZip('${fullPath}')">打包下载</button>
                     <button class="del" onclick="event.stopPropagation();delFolder('${fullPath}')">删除</button>
                 </div>
-                <div id="${fid}" style="padding:4px 12px;display:block;">
+                <div id="${fid}">
                     ${childHtml}
-                    ${fileHtml}
                 </div>
             </div>`
         }
         // 渲染当前层级直接的文件
         const rootFileHtml = Object.values(node._files).map(file => `
-            <div class="file-item" style="padding:4px 0;margin-left:${depth * 16}px">
+            <div class="file-item" data-depth="${depth}">
                 <a href="${file.file_url}" target="_blank">${file.displayName}</a>
                 <button onclick="downloadFile('${file.displayName}','${file.file_url}')">下载</button>
                 <button class="del" onclick="delFile('${file.id}','${file.storage_path}')">删除</button>
@@ -371,6 +370,7 @@ async function loadFiles() {
         html += rootFileHtml;
         return html;
     }
+
     wrap.innerHTML = renderTree(tree);
 }
 /**
