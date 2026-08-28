@@ -190,7 +190,7 @@ async function traverseEntries(entries) {
     // 全部上传完成
     isDone = true;
     cancelAnimationFrame(rafId);
-    updateProgress(totalCount, currentFinished, 'upload');
+    updateProgress(totalCount, currentFinished, 'upload', estimateText);
 
     setTimeout(() => {
         updateProgress(0, 0, 'upload');
@@ -235,6 +235,7 @@ async function uploadSingleFileWithPath(file, fullPath) {
  * @param {string} [estimateText=''] - 追加预估时间文字
  */
 function updateProgress(total, finished, type = 'upload', estimateText = '') {
+    console.log('updateProgress收到', estimateText);
     const progressDom = document.getElementById('uploadProgress');
     const tipDom = document.getElementById('uploadTip');
     if (!progressDom || !tipDom) return;
@@ -249,6 +250,9 @@ function updateProgress(total, finished, type = 'upload', estimateText = '') {
     let tipStr = '';
     if (type === 'upload') {
         tipStr = `上传中 ${finished}/${total} (${percent}%)`;
+        if (estimateText) {
+            tipStr += `，${estimateText}`;
+        }
     } else if (type === 'delete') {
         tipStr = `删除中 ${finished}/${total} (${percent}%)`;
         if (estimateText) {
@@ -589,7 +593,7 @@ async function uploadFile() {
     // 全部完成
     isDone = true;
     cancelAnimationFrame(rafId);
-    updateProgress(totalCount, currentFinished, 'upload');
+    updateProgress(totalCount, currentFinished, 'upload', estimateText);
 
     setTimeout(() => {
         updateProgress(0, 0, 'upload');
@@ -602,34 +606,50 @@ async function uploadFile() {
  */
 async function uploadFolder() {
     const fileInput = document.getElementById("folderInput");
+    const folderTip = document.getElementById("fileTip");
+    /**文件数组 @type {File[]}*/
     const files = Array.from(fileInput.files);
     if (files.length === 0) return;
     const totalCount = files.length;
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    fileTip.textContent = `已选${totalCount}个文件`;
     let currentFinished = 0;
+    let totalUploadBytes = 0;
     const startTs = performance.now();
     let rafId = null;
     let isDone = false;
+    let avgKbPerSec = 10;
     /** rAF 进度渲染循环 */
     function renderLoop() {
         if (isDone) return;
+        console.log('renderLoop执行');
         rafId = requestAnimationFrame(renderLoop);
         const now = performance.now();
         const costMs = now - startTs;
-        let estimateText = "预计剩余 计算中…";
-
-        if (currentFinished > 0 && costMs > 0) {
-            const speed = currentFinished / costMs;
-            const remainNum = totalCount - currentFinished;
-            const remainMs = remainNum / speed;
-            estimateText = formatMs(remainMs);
+        const costSec = costMs / 1000;
+        let kbPerSec = avgKbPerSec;
+        let bytesPerSec = kbPerSec * 1024;
+        if (totalUploadBytes > 0 && costSec > 0) {
+            hasRealSpeed = true;
+            bytesPerSec = totalUploadBytes / costSec;
+            kbPerSec = bytesPerSec / 1024;
+            avgKbPerSec = (avgKbPerSec * 0.7 + kbPerSec * 0.3);
         }
+        const remainBytes = totalBytes - totalUploadBytes;
+        const remainSec = remainBytes / bytesPerSec;
+        const finalRemainMs = Math.max(remainSec * 1000, 1000);
+        const showKb = avgKbPerSec.toFixed(2);
+        const estimateText = `${formatMs(finalRemainMs)}，速度 ${showKb} KB/s`;
+        console.log(estimateText);
         updateProgress(totalCount, currentFinished, 'upload', estimateText);
     }
+
     // 启动rAF
     rafId = requestAnimationFrame(renderLoop);
     for (const file of files) {
         await uploadSingleFileWithPath(file, file.webkitRelativePath);
         currentFinished++;
+        totalUploadBytes += file.size;
     }
     // 全部完成
     isDone = true;
