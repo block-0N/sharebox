@@ -1,9 +1,15 @@
 // Supabase信息
 const SUPABASE_URL = "https://ekphociqviwojbonbcbd.supabase.co";
 const ANON_KEY = "sb_publishable_ebvcoe-OiDqlZJTkIsvZ1g_KsDf4sSU";
+/**
+ * @type {object}
+ */
 const sb = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
+
 /*聊天部分*/
-// 加载历史消息
+/**
+ * 加载历史消息
+ */
 async function loadMessages() {
     console.log("开始加载聊天消息");
     const { data, error } = await sb.from("messages").select("*").order("created_at", { asc: true });
@@ -14,7 +20,10 @@ async function loadMessages() {
     else console.log("消息加载成功，共", data?.length || 0, "条", data);
     renderMsg(data || [])
 }
-// 渲染消息
+/**
+ * 渲染消息
+ * @param {Array} list 
+ */
 function renderMsg(list) {
     console.log("开始渲染消息列表");
     const box = document.getElementById("msgBox");
@@ -26,7 +35,10 @@ function renderMsg(list) {
     box.scrollTop = box.scrollHeight;
     console.log("消息渲染完成");
 }
-// 发送消息
+/**
+ * 发送消息
+ * @returns {void}
+ */
 async function sendMsg() {
     const name = document.getElementById("userName").value || "匿名";
     const content = document.getElementById("msgInput").value.trim();
@@ -34,7 +46,10 @@ async function sendMsg() {
     await sb.from("messages").insert({ username: name, content });
     document.getElementById("msgInput").value = "";
 }
-// 删除消息
+/**
+ * 删除消息
+ * @param {string} msgId 
+ */
 async function delMsg(msgId) {
     const { error } = await sb.from("messages").delete().eq("id", msgId);
     if (error) {
@@ -57,7 +72,10 @@ sb.channel("public_chat")
 // 全局变量：上传计数
 let uploadTotal = 0, uploadFinished = 0;
 let dropArea = null;
-// 自动轮询等待dropArea元素存在再初始化拖拽
+/**
+ * 自动轮询等待dropArea元素存在再初始化拖拽
+ * @returns {void}
+ */
 function tryInitDrop() {
     dropArea = document.getElementById('dropArea');
     if (!dropArea) {
@@ -93,9 +111,18 @@ function tryInitDrop() {
     })
 }
 tryInitDrop();
-// 递归遍历文件夹
+/**
+ * 拖拽递归遍历文件夹并上传，rAF平滑进度 + 动态预估剩余时间
+ * @param {FileSystemEntry[]} entries 
+ * @returns {Promise<void>}
+ */
 async function traverseEntries(entries) {
     const allEntries = [];
+    /**
+     * 读取单个目录下的所有子条目
+     * @param {FileSystemDirectoryEntry} dirEntry - 目录条目
+     * @returns {Promise<FileSystemEntry[]>}
+     */
     const readAllEntries = async (dirEntry) => {
         return new Promise((resolve) => {
             const reader = dirEntry.createReader();
@@ -113,6 +140,11 @@ async function traverseEntries(entries) {
             read();
         })
     }
+    /**
+     * 递归收集所有文件条目
+     * @param {FileSystemEntry[]} list - 条目列表
+     * @returns {Promise<void>}
+     */
     const collect = async (list) => {
         for (const entry of list) {
             if (entry.isFile) {
@@ -123,21 +155,63 @@ async function traverseEntries(entries) {
             }
         }
     }
+    // 递归收集全部文件
     await collect(entries);
-    uploadTotal = allEntries.length;
-    uploadFinished = 0;
-    updateProgress(allEntries.length, uploadFinished, 'upload');
+    const totalCount = allEntries.length;
+    if (totalCount === 0) return;
+    let currentFinished = 0;
+    const startTs = performance.now();
+    let rafId = null;
+    let isDone = false;
+    /** rAF 进度渲染循环 */
+    function renderLoop() {
+        if (isDone) return;
+        rafId = requestAnimationFrame(renderLoop);
+        const now = performance.now();
+        const costMs = now - startTs;
+        let estimateText = "预计剩余 计算中…";
+
+        if (currentFinished > 0 && costMs > 0) {
+            const speed = currentFinished / costMs;
+            const remainNum = totalCount - currentFinished;
+            const remainMs = remainNum / speed;
+            estimateText = formatMs(remainMs);
+        }
+        updateProgress(totalCount, currentFinished, 'upload', estimateText);
+    }
+    // 启动rAF进度刷新
+    rafId = requestAnimationFrame(renderLoop);
+    // 循环上传
     for (const entry of allEntries) {
         const file = await getFileFromEntry(entry);
         await uploadSingleFileWithPath(file, entry.fullPath);
-        uploadFinished++;
-        updateProgress(allEntries.length, uploadFinished, 'upload');
+        currentFinished++;
     }
+    // 全部上传完成
+    isDone = true;
+    cancelAnimationFrame(rafId);
+    updateProgress(totalCount, currentFinished, 'upload');
+
+    setTimeout(() => {
+        updateProgress(0, 0, 'upload');
+        loadFiles();
+    }, 800);
 }
+
+/**
+ * 从 FileSystemFileEntry 获取 File 对象
+ * @param {FileSystemFileEntry} entry - 文件条目
+ * @returns {Promise<File>}
+ */
 async function getFileFromEntry(entry) {
     return new Promise(resolve => entry.file(file => resolve(file)))
 }
-// 统一上传入口
+/**
+ * 统一上传入口
+ * @param {File} file 
+ * @param {string} fullPath 
+ * @returns {void}
+ */
 async function uploadSingleFileWithPath(file, fullPath) {
     const ext = file.name.split('.').pop();
     const safePath = `${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
@@ -204,7 +278,10 @@ function updateProgress(total, finished, type = 'upload', estimateText = '') {
 }
 
 
-// 加载文件列表树形嵌套
+/**
+ * 加载文件列表树形嵌套
+ * @returns {void}
+ */
 async function loadFiles() {
     const { data } = await sb.from("file_list").select("*").order("created_at", { desc: true });
     const wrap = document.getElementById("fileList");
@@ -215,8 +292,32 @@ async function loadFiles() {
         wrap.appendChild(nofile);
         return;
     }
-    // 构建树形结构
+    /**
+    * 文件树根对象
+    * @typedef {Object} TreeNode
+    * @property {Record<string, any>} _files - 当前目录下文件集合 key:文件名 value:文件数据
+    * @property {Record<string, TreeNode>} _children - 子目录集合 key:目录名 value:子节点
+    */
+    /**
+    * 文件条目对象
+    * @typedef {Object} FileItem
+    * @property {string} file_name - 文件原始完整路径
+    * @property {string} file_url - 文件公开访问地址
+    * @property {string} storage_path - supabase存储内路径
+    * @property {string} displayName - 仅文件名（剥离路径）
+    */
+    /**
+     * 构建树形结构
+     *  @type {TreeNode} 
+     */
     const tree = { _files: {}, _children: {} };
+
+    /**
+     * 根据文件路径字符串，将文件条目挂载到树形对象中
+     * @param {string} pathStr - 文件完整路径，格式类似 a/b/c/test.txt
+     * @param {FileItem} fileItem - 文件数据对象
+     * @returns {void}
+     */
     function addToTree(pathStr, fileItem) {
         const parts = pathStr.split('/');
         const filename = parts.pop();
@@ -272,7 +373,11 @@ async function loadFiles() {
     }
     wrap.innerHTML = renderTree(tree);
 }
-// 删除文件夹（rAF平滑进度 + 预估剩余时间，底层5个一批批量删除）
+/**
+ * 删除文件夹（rAF平滑进度 + 预估剩余时间，底层5个一批批量删除）
+ * @param {string} folderPrefix 
+ * @returns {void}
+ */
 async function delFolder(folderPrefix) {
     if (!confirm(`确定要删除【${folderPrefix}】及其内部所有文件吗？该操作不可恢复！`)) return;
     console.log("待删除目录前缀：", folderPrefix);
@@ -299,15 +404,6 @@ async function delFolder(folderPrefix) {
     const startTs = performance.now();
     let rafId = null;
     let isDone = false;
-
-    // 时间格式化：毫秒转 分秒/秒
-    function formatMs(ms) {
-        const s = Math.round(ms / 1000);
-        if (s < 60) return `预计剩余 ${s}秒`;
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return `预计剩余 ${m}分${sec}秒`;
-    }
 
     // rAF 渲染循环
     function renderLoop() {
@@ -391,14 +487,6 @@ async function downloadFolderZip(folderPrefix) {
     let rafId = null;
     let isDone = false;
 
-    // 时间格式化
-    function formatMs(ms) {
-        const s = Math.round(ms / 1000);
-        if (s < 60) return `预计剩余 ${s}秒`;
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return `预计剩余 ${m}分${sec}秒`;
-    }
     // rAF平滑渲染
     function renderLoop() {
         if (isDone) return;
@@ -452,40 +540,107 @@ async function downloadFolderZip(folderPrefix) {
 }
 
 
-// 折叠展开切换
+/**
+ * 折叠展开切换
+ * @param {string} id 
+ */
 function toggleFolder(id) {
     const dom = document.getElementById(id);
     dom.style.display = dom.style.display === 'none' ? 'block' : 'none';
 }
-// 普通按钮上传单文件
+/**
+ * 普通按钮上传单/多文件，rAF平滑进度 + 动态预估剩余时间
+ * @returns {Promise<void>}
+ */
 async function uploadFile() {
     const fileInput = document.getElementById("fileInput");
     const files = Array.from(fileInput.files);
-    uploadTotal = files.length;
-    uploadFinished = 0;
-    updateProgress(files.length, uploadFinished, 'upload');
+    if (files.length === 0) return;
+    const totalCount = files.length;
+    let currentFinished = 0;
+    const startTs = performance.now();
+    let rafId = null;
+    let isDone = false;
+    /** rAF 进度渲染循环 */
+    function renderLoop() {
+        if (isDone) return;
+        rafId = requestAnimationFrame(renderLoop);
+        const now = performance.now();
+        const costMs = now - startTs;
+        let estimateText = "预计剩余 计算中…";
+        if (currentFinished > 0 && costMs > 0) {
+            const speed = currentFinished / costMs;
+            const remainNum = totalCount - currentFinished;
+            const remainMs = remainNum / speed;
+            estimateText = formatMs(remainMs);
+        }
+        updateProgress(totalCount, currentFinished, 'upload', estimateText);
+    }
+
+    // 启动rAF
+    rafId = requestAnimationFrame(renderLoop);
+
     for (const file of files) {
         console.log("正在上传文件：", file.name);
         await uploadSingleFileWithPath(file, file.name);
-        uploadFinished++;
-        updateProgress(files.length, uploadFinished, 'upload');
+        currentFinished++;
     }
-    loadFiles();
+
+    // 全部完成
+    isDone = true;
+    cancelAnimationFrame(rafId);
+    updateProgress(totalCount, currentFinished, 'upload');
+
+    setTimeout(() => {
+        updateProgress(0, 0, 'upload');
+        loadFiles();
+    }, 800);
 }
-// 普通按钮上传文件夹
+/**
+ * 普通按钮上传文件夹，rAF平滑进度 + 动态预估剩余时间
+ * @returns {Promise<void>}
+ */
 async function uploadFolder() {
     const fileInput = document.getElementById("folderInput");
     const files = Array.from(fileInput.files);
-    uploadTotal = files.length;
-    uploadFinished = 0;
-    updateProgress(files.length, uploadFinished, 'upload');
+    if (files.length === 0) return;
+    const totalCount = files.length;
+    let currentFinished = 0;
+    const startTs = performance.now();
+    let rafId = null;
+    let isDone = false;
+    /** rAF 进度渲染循环 */
+    function renderLoop() {
+        if (isDone) return;
+        rafId = requestAnimationFrame(renderLoop);
+        const now = performance.now();
+        const costMs = now - startTs;
+        let estimateText = "预计剩余 计算中…";
+
+        if (currentFinished > 0 && costMs > 0) {
+            const speed = currentFinished / costMs;
+            const remainNum = totalCount - currentFinished;
+            const remainMs = remainNum / speed;
+            estimateText = formatMs(remainMs);
+        }
+        updateProgress(totalCount, currentFinished, 'upload', estimateText);
+    }
+    // 启动rAF
+    rafId = requestAnimationFrame(renderLoop);
     for (const file of files) {
         await uploadSingleFileWithPath(file, file.webkitRelativePath);
-        uploadFinished++;
-        updateProgress(files.length, uploadFinished, 'upload');
+        currentFinished++;
     }
-    loadFiles();
+    // 全部完成
+    isDone = true;
+    cancelAnimationFrame(rafId);
+    updateProgress(totalCount, currentFinished, 'upload');
+    setTimeout(() => {
+        updateProgress(0, 0, 'upload');
+        loadFiles();
+    }, 800);
 }
+
 // 删除单个文件
 async function delFile(rowId, storagePath) {
     await sb.from("file_list").delete().eq("id", rowId);
@@ -493,7 +648,18 @@ async function delFile(rowId, storagePath) {
     console.log("成功删除文件");
     loadFiles();
 }
-
+/**
+ * 时间格式化
+ * @param {number} ms 
+ * @returns {string}
+ */
+function formatMs(ms) {
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `预计剩余 ${s}秒`;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `预计剩余 ${m}分${sec}秒`;
+}
 // 初始化
 loadMessages();
 loadFiles();
