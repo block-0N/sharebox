@@ -10,42 +10,76 @@
 
 <body>
     <h2>ShareBox</h2>
+
+    <!-- 标签栏 -->
+    <div class="tabs">
+        <button class="tab active" data-tab="chat" type="button">💬 公共聊天室</button>
+        <button class="tab" data-tab="netdisk" type="button">📁 公共网盘</button>
+    </div>
+
     <main>
-        <!-- 聊天区域 -->
-        <div class="card">
-            <h3>公共聊天室</h3>
-            <div id="msgBox"></div>
-            <div>
-                <input id="userName" placeholder="昵称" value="匿名用户">
-                <input id="msgInput" placeholder="输入消息">
-                <button onclick="sendMsg()" type="button">发送</button>
+        <!-- 聊天室面板 -->
+        <div id="tab-chat" class="tab-panel active">
+            <div class="card">
+                <div id="msgBox"></div>
+                <div class="chat-input-row">
+                    <input id="userName" placeholder="昵称" value="匿名用户">
+                    <input id="msgInput" placeholder="输入消息">
+                    <button onclick="sendMsg()" type="button">发送</button>
+                </div>
             </div>
         </div>
-        <!-- 网盘区域 -->
-        <div class="card">
-            <h3>公共网盘</h3>
-            <!-- 新增HTML区域：拖拽框 + 进度条 + 原有上传输入 -->
-            <div id="dropArea">
-                将文件/文件夹拖拽到此处上传
+
+        <!-- 网盘面板 -->
+        <div id="tab-netdisk" class="tab-panel">
+            <div class="card">
+                <!-- 拖拽上传区 -->
+                <div id="dropArea">
+                    将文件/文件夹拖拽到此处上传
+                </div>
+
+                <!-- 进度条 -->
+                <div id="progress">
+                    <progress id="uploadProgress" value="0" max="100"></progress>
+                    <span id="uploadTip"></span>
+                </div>
+
+                <!-- 上传按钮 -->
+                <div class="file">
+                    <button onclick="uploadViaFSA()" type="button">📄 选择多个文件</button>
+                    <span id="fileTip">未选择文件</span>
+                </div>
+                <div class="file">
+                    <button onclick="uploadFolderViaFSA()" type="button">📂 选择文件夹</button>
+                    <span id="folderTip">未选择文件夹</span>
+                </div>
+
+                <!-- 资源管理器工具栏 -->
+                <div class="explorer-toolbar">
+                    <button class="nav-btn" id="btnUp" type="button" title="上一级">↑ 上一级</button>
+                    <div id="breadcrumb"></div>
+                    <button class="nav-btn" id="btnRefresh" type="button" title="刷新">⟳</button>
+                </div>
+
+                <!-- 文件列表 -->
+                <div id="fileList"></div>
             </div>
-            <div id="progress">
-                <progress id="uploadProgress" value="0" max="100"></progress>
-                <span id="uploadTip"></span>
-            </div>
-            <div class="file">
-                <input type="file" id="fileInput" title="选择文件" onchange="uploadFile()" multiple hidden>
-                <label for="fileInput">📄 选择多个文件</label>
-                <span id="fileTip">未选择文件</span>
-            </div>
-            <div class="file">
-                <input type="file" id="folderInput" title="选择文件夹" webkitdirectory multiple onchange="uploadFolder()"
-                    hidden>
-                <label for="folderInput">📂 选择文件夹</label>
-                <span id="folderTip">未选择文件夹</span>
-            </div>
-            <div id="fileList"></div>
         </div>
     </main>
+    <!-- 文本查看器 -->
+    <div id="textViewer" class="viewer-overlay">
+        <div class="viewer-box">
+            <div class="viewer-header">
+                <span class="viewer-title" id="viewerTitle">文件预览</span>
+                <div class="viewer-actions">
+                    <button class="fe-btn" id="viewerCopy" type="button">复制</button>
+                    <button class="fe-btn" id="viewerDownload" type="button">下载</button>
+                    <button class="fe-btn del" id="viewerClose" type="button">关闭</button>
+                </div>
+            </div>
+            <pre class="viewer-content" id="viewerContent"></pre>
+        </div>
+    </div>
     <script src="https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./auth.js"></script>
