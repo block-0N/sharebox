@@ -5,7 +5,40 @@ const sb = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
 /* ============================================================
  * 文本查看器
  * ============================================================ */
+/** 扩展名 → highlight.js 语言名 */
+const HLJS_LANG_MAP = {
+    md: 'markdown', markdown: 'markdown',
+    txt: 'plaintext', log: 'plaintext',
+    json: 'json', json5: 'json',
+    xml: 'xml', html: 'xml', htm: 'xml', svg: 'xml',
+    vue: 'xml', svelte: 'xml',
+    css: 'css', scss: 'scss', less: 'less',
+    js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript',
+    ts: 'typescript', tsx: 'typescript',
+    py: 'python', java: 'java',
+    c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp', cc: 'cpp',
+    cs: 'csharp', go: 'go', rs: 'rust', rb: 'ruby', php: 'php',
+    sh: 'bash', bash: 'bash', zsh: 'bash',
+    bat: 'dos', cmd: 'dos', ps1: 'powershell',
+    yaml: 'yaml', yml: 'yaml',
+    toml: 'ini', ini: 'ini', conf: 'ini', cfg: 'ini',
+    sql: 'sql', csv: 'plaintext', tsv: 'plaintext',
+    lua: 'lua', dart: 'dart', swift: 'swift',
+    kt: 'kotlin', kts: 'kotlin', scala: 'scala',
+    r: 'r', pl: 'perl', tex: 'latex',
+    graphql: 'graphql', gql: 'graphql', proto: 'protobuf',
+    asm: 'x86asm', vb: 'vbnet', pas: 'delphi', f90: 'fortran',
+    jl: 'julia', nim: 'nim', zig: 'zig',
+    srt: 'plaintext', vtt: 'plaintext'
+};
 
+/** 根据文件名推断 highlight.js 语言 */
+function detectLang(filename) {
+    const name = String(filename || '').toLowerCase();
+    const idx = name.lastIndexOf('.');
+    if (idx === -1 || idx === 0) return null;
+    return HLJS_LANG_MAP[name.slice(idx + 1)] || null;
+}
 /** 常见可读文本扩展名 */
 const TEXT_EXTS = new Set([
     'txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm', 'css', 'js', 'mjs', 'cjs',
@@ -45,6 +78,7 @@ async function openTextViewer(file) {
     const content = document.getElementById('viewerContent');
 
     title.textContent = file.displayName || file.file_name || '文件预览';
+    content.className = 'viewer-content';       // 重置 class
     content.textContent = '加载中…';
     overlay.classList.add('show');
 
@@ -52,9 +86,23 @@ async function openTextViewer(file) {
         const res = await fetch(file.file_url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const buf = await res.arrayBuffer();
-        // UTF-8 解码，BOM 由 TextDecoder 自动处理
         const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
-        content.textContent = text;
+
+        // 大文件不高亮，避免卡顿
+        if (text.length > 500 * 1024) {
+            content.textContent = text + '\n\n[文件较大，未进行语法高亮]';
+            return;
+        }
+
+        const lang = detectLang(file.displayName);
+        let result;
+        if (lang && window.hljs.getLanguage(lang)) {
+            result = window.hljs.highlight(text, { language: lang, ignoreIllegals: true });
+        } else {
+            result = window.hljs.highlightAuto(text);
+        }
+        content.innerHTML = result.value;
+        content.classList.add('hljs');
     } catch (err) {
         console.error('读取文件失败', err);
         content.textContent = '加载失败：' + err.message;
