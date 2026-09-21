@@ -134,7 +134,7 @@ const FILE_ICON_SVG_MAP = {
     exe: 'file_type_exe.svg',
     msi: 'file_type_exe.svg',
     dmg: 'file_type_dmg.svg',
-    apk: 'file_type_android.svg',
+    apk: 'file_type_exe.svg',
     deb: 'file_type_debian.svg',
     rpm: 'file_type_redhat.svg',
     // 字体
@@ -242,7 +242,20 @@ async function openTextViewer(file) {
         const res = await fetch(file.file_url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const buf = await res.arrayBuffer();
-        const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+
+        // 先尝试严格 UTF-8，失败则回退 GBK
+        let text;
+        try {
+            text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+        } catch (e) {
+            // 非法 UTF-8 序列 → 大概率是 GBK
+            try {
+                text = new TextDecoder('gbk', { fatal: false }).decode(buf);
+            } catch (e2) {
+                // 连 GBK 都不支持就退回宽松 UTF-8
+                text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+            }
+        }
 
         // 大文件不高亮，避免卡顿
         if (text.length > 500 * 1024) {
@@ -566,7 +579,138 @@ function openPreview(file) {
     if (isVideoFile(name)) return openVideoPreview(file);
     if (isAudioFile(name)) return openAudioPreview(file);
     if (isOfficeFile(name)) return openOfficePreview(file);
-    downloadFile(name, file.file_url);
+    return openUnknownFile(file);
+}
+/**
+ * 手动选择打开方式（右键「打开方式」）
+ * @param {{displayName?: string, file_name?: string, file_url: string}} file
+ */
+async function chooseOpenMethod(file) {
+    const label = file.displayName || file.file_name || '文件';
+    const name = String(label).toLowerCase();
+
+    // 按文件类型给出可选方式
+    const opts = [];
+
+    // 大部分文本/图片/音频/视频/pdf/office/zip 都可以尝试文本查看
+    opts.push({ label: '文本查看', value: 'text' });
+
+    // 16 进制对所有文件都适用
+    opts.push({ label: '16进制查看', value: 'hex', primary: true });
+
+    if (isImageFile(name)) opts.push({ label: '图片预览', value: 'image' });
+    if (isPdfFile(name)) opts.push({ label: 'PDF 预览', value: 'pdf' });
+    if (isVideoFile(name)) opts.push({ label: '视频播放', value: 'video' });
+    if (isAudioFile(name)) opts.push({ label: '音频播放', value: 'audio' });
+    if (isOfficeFile(name)) opts.push({ label: 'Office 预览', value: 'office' });
+    if (isZipFile(name)) opts.push({ label: 'ZIP 查看', value: 'zip' });
+
+    opts.push({ label: '下载', value: 'download' });
+
+    const choice = await dlgChoose('选择打开方式', label, opts);
+    if (choice === 'text') return openTextViewer(file);
+    if (choice === 'hex') return openHexViewer(file);
+    if (choice === 'image') return openImagePreview(file);
+    if (choice === 'pdf') return openPdfPreview(file);
+    if (choice === 'video') return openVideoPreview(file);
+    if (choice === 'audio') return openAudioPreview(file);
+    if (choice === 'office') return openOfficePreview(file);
+    if (choice === 'zip') return openZipViewer(file);
+    if (choice === 'download') return downloadFile(label, file.file_url);
+}
+/**
+ * 未知类型：让用户选择打开方式
+ * @param {{displayName?: string, file_name?: string, file_url: string}} file
+ */
+async function openUnknownFile(file) {
+    const label = file.displayName || file.file_name || '文件';
+    const choice = await dlgChoose(
+        '选择打开方式',
+        label,
+        [
+            { label: '文本查看', value: 'text', primary: true },
+            { label: '16进制查看', value: 'hex' },
+            { label: '下载', value: 'download' }
+        ]
+    );
+    if (choice === 'text') return openTextViewer(file);
+    if (choice === 'hex') return openHexViewer(file);
+    if (choice === 'download') return downloadFile(label, file.file_url);
+}
+
+/**
+ * 16 进制查看
+ * @param {{displayName?: string, file_name?: string, file_url: string}} file
+ */
+async function openHexViewer(file) {
+    viewerCurrentFile = file;
+    const overlay = document.getElementById('textViewer');
+    const title = document.getElementById('viewerTitle');
+    const content = document.getElementById('viewerContent');
+
+    title.textContent = file.displayName || file.file_name || 'HEX 预览';
+    content.className = 'viewer-content';
+    content.style.fontSize = '';
+    content.textContent = '正在读取…';
+    overlay.classList.add('show');
+
+    try {
+        const res = await fetch(file.file_url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+
+        const MAX = 4 * 1024 * 1024;   // 4MB 上限
+        const truncated = buf.byteLength > MAX;
+        const bytes = new Uint8Array(truncated ? buf.slice(0, MAX) : buf);
+
+        content.innerHTML = renderHexDump(bytes);
+        if (truncated) {
+            content.insertAdjacentHTML('beforeend',
+                `<div class="hex-hint">文件较大，仅显示前 ${formatBytes(MAX)}</div>`);
+        }
+    } catch (err) {
+        console.error('HEX 预览失败', err);
+        content.textContent = 'HEX 读取失败：' + err.message;
+    }
+}
+
+/**
+ * 生成 16 进制 dump 的 HTML
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function renderHexDump(bytes) {
+    const total = bytes.length;
+    const lines = [];
+
+    for (let i = 0; i < total; i += 16) {
+        const offset = i.toString(16).padStart(8, '0');
+
+        // hex 部分，每 8 字节插个空格分隔
+        const hexParts = [];
+        for (let j = 0; j < 16; j++) {
+            if (j === 8) hexParts.push('');
+            if (i + j < total) hexParts.push(bytes[i + j].toString(16).padStart(2, '0'));
+            else hexParts.push('  ');
+        }
+
+        // ASCII 部分
+        let ascii = '';
+        for (let j = 0; j < 16 && i + j < total; j++) {
+            const c = bytes[i + j];
+            ascii += (c >= 32 && c < 127) ? String.fromCharCode(c) : '.';
+        }
+
+        lines.push(
+            `<div class="hex-line">` +
+            `<span class="hex-offset">${offset}</span>` +
+            `<span class="hex-bytes">${hexParts.join(' ')}</span>` +
+            `<span class="hex-ascii">${escapeHtml(ascii)}</span>` +
+            `</div>`
+        );
+    }
+
+    return `<div class="hex-viewer">${lines.join('')}</div>`;
 }
 /* ============================================================
  * 通用工具
@@ -696,6 +840,68 @@ function dlgConfirm(title, message, danger) {
 /** 输入，返回 string | null */
 function dlgPrompt(title, message, defaultValue) {
     return _openDialog({ title, message, defaultValue, showInput: true });
+}
+/**
+ * 多选项弹窗
+ * @param {string} title
+ * @param {string} message
+ * @param {Array<{label:string, value:any, primary?:boolean, danger?:boolean}>} options
+ * @returns {Promise<any>} 选中的 value 或 null（取消）
+ */
+function dlgChoose(title, message, options) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('dialog');
+        const titleEl = document.getElementById('dialogTitle');
+        const msgEl = document.getElementById('dialogMessage');
+        const inputEl = document.getElementById('dialogInput');
+        const okBtn = document.getElementById('dialogOk');
+        const cancelBtn = document.getElementById('dialogCancel');
+        const actions = cancelBtn.parentElement;
+
+        const prevInput = inputEl.style.display;
+        const prevOk = okBtn.style.display;
+        const prevCancel = cancelBtn.style.display;
+
+        titleEl.textContent = title || '';
+        msgEl.textContent = message || '';
+        inputEl.style.display = 'none';
+        okBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+
+        const dynBtns = [];
+        for (const opt of options) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dialog-btn ' + (opt.danger ? 'danger' : (opt.primary ? 'primary' : ''));
+            btn.textContent = opt.label;
+            actions.appendChild(btn);
+            dynBtns.push({ btn, opt });
+        }
+
+        const cleanup = () => {
+            overlay.classList.remove('show');
+            dynBtns.forEach(({ btn }) => btn.remove());
+            inputEl.style.display = prevInput;
+            okBtn.style.display = prevOk;
+            cancelBtn.style.display = prevCancel;
+            overlay.removeEventListener('click', onOverlay);
+            document.removeEventListener('keydown', onKey);
+        };
+
+        const finish = (value) => { cleanup(); resolve(value); };
+
+        dynBtns.forEach(({ btn, opt }) => {
+            btn.addEventListener('click', () => finish(opt.value));
+        });
+
+        const onOverlay = (e) => { if (e.target === overlay) finish(null); };
+        const onKey = (e) => { if (e.key === 'Escape') finish(null); };
+
+        overlay.addEventListener('click', onOverlay);
+        document.addEventListener('keydown', onKey);
+
+        overlay.classList.add('show');
+    });
 }
 /* ============================================================
  * 标签切换
@@ -1034,10 +1240,7 @@ function renderFileList() {
     }
 
     for (const file of files) {
-        const canOpen = canPreviewFile(file.displayName);
-        const openBtn = canOpen
-            ? `<button class="fe-btn" data-action="open" type="button">打开</button>`
-            : '';
+        const openBtn = `<button class="fe-btn" data-action="open" type="button">打开</button>`;
         const sizeText = formatBytes(file._size || 0);
         const mtimeText = formatTime(file._mtime);
         html += `
@@ -1124,11 +1327,7 @@ function initExplorerEvents() {
         }
         const file = findFileByStoragePath(item.dataset.path);
         if (!file) return;
-        if (canPreviewFile(file.displayName)) {
-            openPreview(file);
-        } else {
-            downloadFile(file.displayName, file.file_url);
-        }
+        openPreview(file);
     });
 
     // 面包屑点击
@@ -2339,6 +2538,13 @@ function showContextMenu(x, y) {
                     action: () => {
                         const f = findFileByStoragePath(sel.path);
                         if (f) openPreview(f);
+                    }
+                });
+                items.push({
+                    label: '打开方式',
+                    action: () => {
+                        const f = findFileByStoragePath(sel.path);
+                        if (f) chooseOpenMethod(f);
                     }
                 });
                 items.push({

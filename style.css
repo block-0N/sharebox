@@ -634,6 +634,16 @@ button:hover {
     box-sizing: border-box;
 }
 
+.search-bar input::placeholder {
+    color: #94a3b8;
+    opacity: 0.7;
+}
+
+/* 输入框里的文字本身也淡一点 */
+.search-bar input {
+    color: #64748b;
+}
+
 .search-hint {
     padding: 8px 12px;
     color: #64748b;
@@ -1074,6 +1084,15 @@ body.dark .search-bar input {
     border-color: #475569;
 }
 
+body.dark .search-bar input::placeholder {
+    color: #64748b;
+    opacity: 0.7;
+}
+
+body.dark .search-bar input {
+    color: #94a3b8;
+}
+
 body.dark .search-hint {
     color: #94a3b8;
 }
@@ -1248,4 +1267,59 @@ body.dark .fe-item.fe-folder.drop-target .fe-name {
 body.dark .rubber-band {
     border-color: #5dade2;
     background: rgba(93, 173, 226, 0.15);
+}
+
+/* ---------- 16 进制查看器 ---------- */
+.hex-viewer {
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre;
+}
+
+.hex-line {
+    display: flex;
+    gap: 14px;
+}
+
+.hex-offset {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.hex-bytes {
+    color: #2980b9;
+    flex-shrink: 0;
+    white-space: pre;
+}
+
+.hex-ascii {
+    color: #334155;
+    white-space: pre;
+}
+
+.hex-hint {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+    color: #94a3b8;
+    font-size: 12px;
+    text-align: center;
+}
+
+body.dark .hex-offset {
+    color: #64748b;
+}
+
+body.dark .hex-bytes {
+    color: #5dade2;
+}
+
+body.dark .hex-ascii {
+    color: #cbd5e1;
+}
+
+body.dark .hex-hint {
+    border-top-color: #334155;
+    color: #64748b;
 }
