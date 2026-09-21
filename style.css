@@ -808,3 +808,444 @@ button:hover {
 #fileList {
     user-select: none;
 }
+
+/* ---------- 右键菜单子菜单 ---------- */
+.context-menu-item .arrow {
+    color: #94a3b8;
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.context-menu-item.has-children {
+    position: relative;
+}
+
+.context-submenu {
+    position: fixed;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.15);
+    padding: 4px 0;
+    min-width: 150px;
+    display: none;
+    z-index: 2100;
+    font-size: 14px;
+    user-select: none;
+}
+
+.context-submenu.show {
+    display: block;
+}
+
+/* ---------- 拖拽移动 ---------- */
+.drag-ghost {
+    position: fixed;
+    padding: 4px 12px;
+    background: #2980b9;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 4000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0.9;
+}
+
+.fe-item.fe-folder.drop-target {
+    background: #b7dff8;
+    outline: 2px dashed #2980b9;
+    outline-offset: -2px;
+}
+
+.fe-item.fe-folder.drop-target .fe-name {
+    color: #0f172a;
+}
+
+/* ---------- 顶部栏 ---------- */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.top-bar h2 {
+    margin: 0;
+}
+
+.theme-toggle {
+    padding: 6px 14px;
+    font-size: 13px;
+    background: #eaf3fa;
+    color: #2980b9;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.theme-toggle:hover {
+    background: #d8ebfa;
+}
+
+/* ---------- 深色模式 ---------- */
+body.dark {
+    background-color: #0f172a;
+    color: #5dade2;
+}
+
+body.dark .card {
+    background: #1e293b;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .card:hover {
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+body.dark .theme-toggle {
+    background: #1e3a5f;
+    color: #5dade2;
+}
+
+body.dark .theme-toggle:hover {
+    background: #2a4a72;
+}
+
+/* 标签栏 */
+body.dark .tabs {
+    border-bottom-color: #334155;
+}
+
+body.dark .tab {
+    background: transparent;
+    color: #94a3b8;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+}
+
+body.dark .tab:hover {
+    background: transparent;
+    color: #5dade2;
+}
+
+body.dark .tab.active {
+    background: transparent;
+    color: #5dade2;
+    border-bottom-color: #5dade2;
+}
+
+/* 聊天室 */
+body.dark #msgBox {
+    background: #111827;
+    border-color: #334155;
+}
+
+body.dark .msg-item {
+    color: #cbd5e1;
+}
+
+body.dark .chat-input-row input {
+    background: #172033;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+/* 上传区 */
+body.dark #dropArea {
+    background: #172033;
+    border-color: #2d4258;
+    color: #5dade2;
+}
+
+body.dark #dropArea:hover,
+body.dark #dropArea.dragover {
+    background: #1e2c42;
+    border-color: #5dade2;
+}
+
+/* 通用按钮 */
+body.dark button {
+    background: #5dade2;
+    color: #0f172a;
+}
+
+body.dark button:hover {
+    background: #3498db;
+}
+
+body.dark .del,
+body.dark button.del {
+    background: #ef4444;
+    color: #fff;
+}
+
+body.dark .del:hover,
+body.dark button.del:hover {
+    background: #dc2626;
+}
+
+/* 资源管理器工具栏 */
+body.dark .explorer-toolbar {
+    background: #172033;
+    border-color: #334155;
+}
+
+body.dark .nav-btn {
+    background: #1e3a5f;
+    color: #5dade2;
+}
+
+body.dark .nav-btn:hover:not(:disabled) {
+    background: #2a4a72;
+}
+
+body.dark .crumb {
+    color: #5dade2;
+}
+
+body.dark .crumb:hover {
+    background: #1e3a5f;
+}
+
+body.dark .crumb.current {
+    color: #e2e8f0;
+}
+
+body.dark .crumb-sep {
+    color: #64748b;
+}
+
+/* 文件列表 */
+body.dark #fileList {
+    background: #111827;
+    border-color: #334155;
+}
+
+body.dark .fe-item:hover {
+    background: #263449;
+}
+
+body.dark .fe-item.selected {
+    background: #2d4258;
+}
+
+body.dark .fe-name {
+    color: #e2e8f0;
+}
+
+body.dark .fe-item.fe-folder .fe-name {
+    color: #5dade2;
+}
+
+body.dark .fe-meta {
+    color: #64748b;
+}
+
+body.dark .nofile {
+    color: #94a3b8;
+}
+
+/* 条目内按钮 */
+body.dark .fe-btn {
+    background: #5dade2;
+    color: #0f172a;
+}
+
+body.dark .fe-btn:hover {
+    background: #3498db;
+}
+
+body.dark .fe-btn.del {
+    background: #ef4444;
+    color: #fff;
+}
+
+body.dark .fe-btn.del:hover {
+    background: #dc2626;
+}
+
+/* 搜索 */
+body.dark .search-bar input {
+    background: #172033;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+body.dark .search-hint {
+    color: #94a3b8;
+}
+
+body.dark .search-path {
+    color: #64748b;
+}
+
+/* 右键菜单 */
+body.dark .context-menu,
+body.dark .context-submenu {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+body.dark .context-menu-item {
+    color: #cbd5e1;
+}
+
+body.dark .context-menu-item:hover {
+    background: #263449;
+    color: #5dade2;
+}
+
+body.dark .context-menu-item.disabled,
+body.dark .context-menu-item.disabled:hover {
+    color: #475569;
+}
+
+body.dark .context-menu-item.disabled:hover {
+    background: transparent;
+}
+
+body.dark .context-menu-item.danger {
+    color: #ef4444;
+}
+
+body.dark .context-menu-item.danger:hover {
+    background: #3a1e1e;
+}
+
+body.dark .context-menu-item .shortcut,
+body.dark .context-menu-item .arrow {
+    color: #64748b;
+}
+
+body.dark .context-menu-sep {
+    background: #334155;
+}
+
+/* 查看器 */
+body.dark .viewer-box {
+    background: #1e293b;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .viewer-header {
+    background: #172033;
+    border-bottom-color: #334155;
+}
+
+body.dark .viewer-title {
+    color: #e2e8f0;
+}
+
+body.dark .viewer-content {
+    background: #0f172a;
+    color: #cbd5e1;
+}
+
+body.dark .viewer-audio-name {
+    color: #cbd5e1;
+}
+
+body.dark .viewer-hint {
+    color: #64748b;
+}
+
+/* ZIP 表格 */
+body.dark .zip-summary {
+    background: #263449;
+    color: #cbd5e1;
+}
+
+body.dark .zip-summary b {
+    color: #f1f5f9;
+}
+
+body.dark .zip-table thead th {
+    background: #172033;
+    color: #cbd5e1;
+    border-bottom-color: #334155;
+}
+
+body.dark .zip-table tbody td {
+    border-bottom-color: #263449;
+    color: #cbd5e1;
+}
+
+body.dark .zip-table tbody tr:hover {
+    background: #263449;
+}
+
+body.dark .zip-size,
+body.dark .zip-ratio {
+    color: #94a3b8;
+}
+
+/* 通用弹窗 */
+body.dark .dialog-box {
+    background: #1e293b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .dialog-title {
+    color: #f1f5f9;
+}
+
+body.dark .dialog-message {
+    color: #cbd5e1;
+}
+
+body.dark .dialog-input {
+    background: #172033;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+body.dark .dialog-btn {
+    background: #334155;
+    color: #cbd5e1;
+}
+
+body.dark .dialog-btn:hover {
+    background: #475569;
+}
+
+body.dark .dialog-btn.primary {
+    background: #5dade2;
+    color: #0f172a;
+}
+
+body.dark .dialog-btn.primary:hover {
+    background: #3498db;
+}
+
+body.dark .dialog-btn.danger {
+    background: #ef4444;
+    color: #fff;
+}
+
+body.dark .dialog-btn.danger:hover {
+    background: #dc2626;
+}
+
+/* 拖拽 / 框选 */
+body.dark .drag-ghost {
+    background: #5dade2;
+    color: #0f172a;
+}
+
+body.dark .fe-item.fe-folder.drop-target {
+    background: #2a4a72;
+    outline-color: #5dade2;
+}
+
+body.dark .fe-item.fe-folder.drop-target .fe-name {
+    color: #f1f5f9;
+}
+
+body.dark .rubber-band {
+    border-color: #5dade2;
+    background: rgba(93, 173, 226, 0.15);
+}

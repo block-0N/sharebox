@@ -9,7 +9,10 @@
 </head>
 
 <body>
-    <h2>ShareBox</h2>
+    <div class="top-bar">
+        <h2>ShareBox</h2>
+        <button id="themeToggle" class="theme-toggle" type="button">🌙 深色</button>
+    </div>
 
     <!-- 标签栏 -->
     <div class="tabs">
@@ -97,9 +100,11 @@
             <div class="viewer-content" id="viewerContent"></div>
         </div>
     </div>
-    <!-- 代码高亮 -->
-    <link rel="stylesheet"
+    <!-- 代码高亮（浅色 / 深色两套，靠 media 切换） -->
+    <link id="hljsLight" rel="stylesheet" media="all"
         href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+    <link id="hljsDark" rel="stylesheet" media="not all"
+        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
