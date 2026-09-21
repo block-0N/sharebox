@@ -342,9 +342,8 @@ function canPreviewFile(filename) {
 /** 判断是否是 zip */
 function isZipFile(filename) {
     const name = String(filename || '').toLowerCase();
-    return name.endsWith('.zip') || name.endsWith('.jar') || name.endsWith('.apk') ||
-        name.endsWith('.docx') || name.endsWith('.xlsx') || name.endsWith('.pptx') ||
-        name.endsWith('.epub');
+    return name.endsWith('.zip') || name.endsWith('.jar') ||
+           name.endsWith('.apk') || name.endsWith('.epub');
 }
 
 /**
