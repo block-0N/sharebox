@@ -2,6 +2,8 @@
 const SUPABASE_URL = "https://ekphociqviwojbonbcbd.supabase.co";
 const ANON_KEY = "sb_publishable_ebvcoe-OiDqlZJTkIsvZ1g_KsDf4sSU";
 const sb = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
+/** 文件夹占位文件名 */
+const FOLDER_PLACEHOLDER = '.gitkeep';
 /* ============================================================
  * 文件图标（vscode-icons）
  * ============================================================ */
@@ -292,7 +294,7 @@ function initTextViewer() {
             setTimeout(() => { btn.textContent = old; }, 1000);
         } catch (err) {
             console.error('复制失败', err);
-            alert('复制失败，可能浏览器未授予剪贴板权限');
+            await dlgAlert('复制失败，可能浏览器未授予剪贴板权限');
         }
     });
     // 点遮罩关闭
@@ -343,7 +345,7 @@ function canPreviewFile(filename) {
 function isZipFile(filename) {
     const name = String(filename || '').toLowerCase();
     return name.endsWith('.zip') || name.endsWith('.jar') ||
-           name.endsWith('.apk') || name.endsWith('.epub');
+        name.endsWith('.apk') || name.endsWith('.epub');
 }
 
 /**
@@ -597,7 +599,88 @@ function formatMs(ms) {
     const sec = s % 60;
     return `预计剩余 ${m}分${sec}秒`;
 }
+/* ============================================================
+ * 通用弹窗
+ * ============================================================ */
 
+/**
+ * 打开弹窗，Promise 返回结果
+ * @param {object} opts
+ * @param {string} [opts.title]
+ * @param {string} [opts.message]
+ * @param {boolean} [opts.showInput]
+ * @param {string} [opts.defaultValue]
+ * @param {boolean} [opts.showCancel] 默认 true
+ * @param {boolean} [opts.danger]
+ * @param {string} [opts.okText]
+ * @returns {Promise<any>} alert→true, confirm→bool, prompt→string|null
+ */
+function _openDialog(opts) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('dialog');
+        const titleEl = document.getElementById('dialogTitle');
+        const msgEl = document.getElementById('dialogMessage');
+        const inputEl = document.getElementById('dialogInput');
+        const okBtn = document.getElementById('dialogOk');
+        const cancelBtn = document.getElementById('dialogCancel');
+
+        titleEl.textContent = opts.title || '';
+        msgEl.textContent = opts.message || '';
+
+        const isPrompt = !!opts.showInput;
+        inputEl.style.display = isPrompt ? 'block' : 'none';
+        if (isPrompt) inputEl.value = opts.defaultValue || '';
+
+        cancelBtn.style.display = opts.showCancel === false ? 'none' : '';
+
+        okBtn.textContent = opts.okText || '确定';
+        okBtn.className = 'dialog-btn ' + (opts.danger ? 'danger' : 'primary');
+
+        overlay.classList.add('show');
+        if (isPrompt) {
+            setTimeout(() => { inputEl.focus(); inputEl.select(); }, 50);
+        }
+
+        const cleanup = () => {
+            overlay.classList.remove('show');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            overlay.removeEventListener('click', onOverlay);
+            document.removeEventListener('keydown', onKey);
+            inputEl.removeEventListener('keydown', onInputKey);
+        };
+
+        const done = (result) => { cleanup(); resolve(result); };
+        const onOk = () => done(isPrompt ? inputEl.value : true);
+        const onCancel = () => done(isPrompt ? null : false);
+        const onOverlay = (e) => { if (e.target === overlay) onCancel(); };
+        const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
+        const onInputKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+        };
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        overlay.addEventListener('click', onOverlay);
+        document.addEventListener('keydown', onKey);
+        if (isPrompt) inputEl.addEventListener('keydown', onInputKey);
+    });
+}
+
+/** 提示 */
+function dlgAlert(title, message, okText) {
+    return _openDialog({ title, message, okText: okText || '好', showCancel: false });
+}
+
+/** 确认，返回 boolean */
+function dlgConfirm(title, message, danger) {
+    return _openDialog({ title, message, danger: !!danger });
+}
+
+/** 输入，返回 string | null */
+function dlgPrompt(title, message, defaultValue) {
+    return _openDialog({ title, message, defaultValue, showInput: true });
+}
 /* ============================================================
  * 标签切换
  * ============================================================ */
@@ -623,7 +706,7 @@ async function loadMessages() {
     const { data, error } = await sb.from("messages").select("*").order("created_at", { asc: true });
     if (error) {
         console.error("消息加载错误", error);
-        alert("消息加载错误：" + error.message);
+        await dlgAlert("消息加载错误：" + error.message);
         return;
     }
     console.log("消息加载成功，共", data?.length || 0, "条");
@@ -654,7 +737,7 @@ async function sendMsg() {
     const { error } = await sb.from("messages").insert({ username: name, content });
     if (error) {
         console.error("发送失败", error);
-        alert("发送失败：" + error.message);
+        await dlgAlert("发送失败：" + error.message);
         return;
     }
     document.getElementById("msgInput").value = "";
@@ -665,7 +748,85 @@ sb.channel("public_chat")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => loadMessages())
     .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, () => loadMessages())
     .subscribe();
+/* ============================================================
+ * 网盘 - Storage 元数据（大小 / 修改时间）
+ * ============================================================ */
 
+/** storage_path → { size, updatedAt } */
+let storageMeta = {};
+
+/**
+ * 拉取 storage 里所有对象的元数据（分页）
+ */
+async function fetchStorageMeta() {
+    const bucket = 'public_netdisk';
+    const pageSize = 100;
+    const maxPages = 10;   // 最多 1000 个对象，够个人测试
+    const map = {};
+
+    for (let page = 0; page < maxPages; page++) {
+        const { data, error } = await sb.storage.from(bucket).list('', {
+            limit: pageSize,
+            offset: page * pageSize,
+            sortBy: { column: 'name', order: 'asc' }
+        });
+        if (error) {
+            console.warn('storage.list 失败，跳过大小/时间显示', error.message);
+            break;
+        }
+        if (!data || data.length === 0) break;
+
+        for (const obj of data) {
+            const meta = obj.metadata || {};
+            map[obj.name] = {
+                size: meta.size ?? meta.contentLength ?? 0,
+                updatedAt: obj.updated_at || obj.created_at || null
+            };
+        }
+        if (data.length < pageSize) break;
+    }
+    return map;
+}
+
+/**
+ * 时间格式化
+ * @param {string|Date|null} t
+ * @returns {string}
+ */
+function formatTime(t) {
+    if (!t) return '';
+    const d = t instanceof Date ? t : new Date(t);
+    if (isNaN(d.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * 递归计算文件夹汇总大小 / 最新修改时间
+ * 结果写到节点上：_totalSize、_latestMtime
+ * @param {any} node
+ */
+function computeFolderStats(node) {
+    let totalSize = 0;
+    let latestTime = null;
+
+    for (const childName of Object.keys(node._children)) {
+        const child = node._children[childName];
+        computeFolderStats(child);
+        totalSize += child._totalSize || 0;
+        const t = child._latestMtime;
+        if (t && (!latestTime || t > latestTime)) latestTime = t;
+    }
+
+    for (const f of Object.values(node._files)) {
+        totalSize += f._size || 0;
+        const t = f._mtime;
+        if (t && (!latestTime || t > latestTime)) latestTime = t;
+    }
+
+    node._totalSize = totalSize;
+    node._latestMtime = latestTime;
+}
 /* ============================================================
  * 网盘 - 状态与树结构
  * ============================================================ */
@@ -700,13 +861,28 @@ function buildTree(data) {
         const parts = String(item.file_name || '').split('/').filter(Boolean);
         const filename = parts.pop();
         if (!filename) continue;
+
+        // 先建父目录链
         let node = tree;
         for (const p of parts) {
             if (!node._children[p]) node._children[p] = { _files: {}, _children: {} };
             node = node._children[p];
         }
-        node._files[filename] = { ...item, displayName: filename };
+
+        // 占位文件：父目录已创建，到此为止
+        if (filename === FOLDER_PLACEHOLDER) continue;
+
+        // 正常文件：挂到 node
+        const meta = storageMeta[item.storage_path] || {};
+        node._files[filename] = {
+            ...item,
+            displayName: filename,
+            _size: meta.size ?? 0,
+            _mtime: meta.updatedAt || item.created_at || null
+        };
     }
+    // 汇总每个文件夹的大小 / 修改时间
+    computeFolderStats(tree);
     return tree;
 }
 
@@ -714,13 +890,16 @@ function buildTree(data) {
  * 加载文件列表并重建树
  */
 async function loadFiles() {
-    const { data, error } = await sb.from("file_list").select("*").order("created_at", { desc: true });
-    if (error) {
-        console.error("文件列表加载失败", error);
+    const [listRes, metaMap] = await Promise.all([
+        sb.from("file_list").select("*").order("created_at", { desc: true }),
+        fetchStorageMeta()
+    ]);
+    if (listRes.error) {
+        console.error("文件列表加载失败", listRes.error);
         return;
     }
-    fileTree = buildTree(data || []);
-    // 若当前路径已不存在，回到根目录
+    storageMeta = metaMap;
+    fileTree = buildTree(listRes.data || []);
     if (!getNodeByPath(currentPath)) currentPath = [];
     renderExplorer();
 }
@@ -763,7 +942,12 @@ function renderBreadcrumb() {
 function renderFileList() {
     const wrap = document.getElementById("fileList");
     if (!wrap) return;
-
+    // 搜索模式
+    if (searchQuery) {
+        renderSearchResults(wrap, searchQuery);
+        wrap.scrollTop = 0;
+        return;
+    }
     const node = getNodeByPath(currentPath);
     if (!node) {
         wrap.innerHTML = `<div class="nofile">文件夹不存在</div>`;
@@ -781,10 +965,15 @@ function renderFileList() {
     let html = "";
 
     for (const name of folders) {
+        const folderNode = node._children[name];
+        const sizeText = formatBytes(folderNode._totalSize || 0);
+        const mtimeText = formatTime(folderNode._latestMtime);
         html += `
         <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(name)}">
             <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
             <span class="fe-name">${escapeHtml(name)}</span>
+            <span class="fe-meta fe-size">${sizeText}</span>
+            <span class="fe-meta fe-mtime">${mtimeText}</span>
             <span class="fe-actions">
                 <button class="fe-btn" data-action="zip" type="button">打包</button>
                 <button class="fe-btn del" data-action="del-folder" type="button">删除</button>
@@ -797,6 +986,8 @@ function renderFileList() {
         const openBtn = canOpen
             ? `<button class="fe-btn" data-action="open" type="button">打开</button>`
             : '';
+        const sizeText = formatBytes(file._size || 0);
+        const mtimeText = formatTime(file._mtime);
         html += `
     <div class="fe-item fe-file"
          data-type="file"
@@ -806,6 +997,8 @@ function renderFileList() {
         <span class="fe-icon"><img src="${getFileIconUrl(file.displayName)}" alt=""
         onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
         <span class="fe-name">${escapeHtml(file.displayName)}</span>
+        <span class="fe-meta fe-size">${sizeText}</span>
+        <span class="fe-meta fe-mtime">${mtimeText}</span>
         <span class="fe-actions">
             ${openBtn}
             <button class="fe-btn" data-action="download" type="button">下载</button>
@@ -827,15 +1020,6 @@ function buildFullPath(base, name) {
     return [...base, name].filter(Boolean).join('/');
 }
 
-/**
- * 在当前节点里按文件名查找
- * @param {string} name
- */
-function findCurrentFile(name) {
-    const node = getNodeByPath(currentPath);
-    return node?._files?.[name] || null;
-}
-
 /* ============================================================
  * 网盘 - 事件绑定（事件委托）
  * ============================================================ */
@@ -848,6 +1032,8 @@ function initExplorerEvents() {
 
     // 单击：选中 / 触发操作按钮
     list.addEventListener("click", e => {
+        if (suppressNextClick) return;
+
         const btn = e.target.closest("button[data-action]");
         const item = e.target.closest(".fe-item");
         if (!item) return;
@@ -862,24 +1048,21 @@ function initExplorerEvents() {
             } else if (action === "del-folder") {
                 delFolder(buildFullPath(currentPath, name));
             } else if (action === "download") {
-                const file = findCurrentFile(name);
+                const file = findFileByStoragePath(item.dataset.path);
                 if (file) downloadFile(file.displayName, file.file_url);
             } else if (action === "open") {
-                const file = findCurrentFile(name);
+                const file = findFileByStoragePath(item.dataset.path);
                 if (file) openPreview(file);
             } else if (action === "del-file") {
                 delFile(item.dataset.id, item.dataset.path);
             }
             return;
         }
-
-        // 选中逻辑
-        list.querySelectorAll(".fe-item.selected").forEach(el => el.classList.remove("selected"));
-        item.classList.add("selected");
     });
 
     // 双击：进入文件夹 / 下载文件
     list.addEventListener("dblclick", e => {
+        if (suppressNextClick) return;
         const item = e.target.closest(".fe-item");
         if (!item) return;
         if (item.dataset.type === "folder") {
@@ -887,7 +1070,7 @@ function initExplorerEvents() {
             renderExplorer();
             return;
         }
-        const file = findCurrentFile(item.dataset.name);
+        const file = findFileByStoragePath(item.dataset.path);
         if (!file) return;
         if (canPreviewFile(file.displayName)) {
             openPreview(file);
@@ -902,6 +1085,13 @@ function initExplorerEvents() {
         if (!crumb) return;
         const idx = parseInt(crumb.dataset.idx, 10);
         currentPath = currentPath.slice(0, idx + 1);
+
+        // 清空搜索
+        if (searchQuery) {
+            searchQuery = '';
+            const input = document.getElementById('searchInput');
+            if (input) input.value = '';
+        }
         renderExplorer();
     });
 
@@ -909,6 +1099,12 @@ function initExplorerEvents() {
     upBtn.addEventListener("click", () => {
         if (currentPath.length === 0) return;
         currentPath.pop();
+
+        if (searchQuery) {
+            searchQuery = '';
+            const input = document.getElementById('searchInput');
+            if (input) input.value = '';
+        }
         renderExplorer();
     });
 
@@ -1142,9 +1338,10 @@ function updateProgress(total, finished, type = 'upload', estimateText = '') {
  * @param {string} storagePath
  */
 async function delFile(rowId, storagePath) {
-    if (!confirm("确定删除该文件？")) return;
+    const ok = await dlgConfirm('删除文件', '确定删除该文件？', true);
+    if (!ok) return;
     const { error: dbErr } = await sb.from("file_list").delete().eq("id", rowId);
-    if (dbErr) { console.error("删除记录失败", dbErr); alert("删除失败"); return; }
+    if (dbErr) { console.error("删除记录失败", dbErr); await dlgAlert("删除失败"); return; }
     const { error: stErr } = await sb.storage.from("public_netdisk").remove([storagePath]);
     if (stErr) { console.error("删除存储失败", stErr); }
     loadFiles();
@@ -1155,10 +1352,11 @@ async function delFile(rowId, storagePath) {
  * @param {string} folderPrefix
  */
 async function delFolder(folderPrefix) {
-    if (!confirm(`确定删除【${folderPrefix}】及其内部所有文件吗？该操作不可恢复！`)) return;
+    const ok = await dlgConfirm('删除文件夹', `确定删除【${folderPrefix}】及其内部所有文件吗？该操作不可恢复！`, true);
+    if (!ok) return;
 
     const { data: allFiles, error } = await sb.from("file_list").select("*");
-    if (error) { console.error("查询文件失败", error); alert("查询文件失败"); return; }
+    if (error) { console.error("查询文件失败", error); await dlgAlert("查询文件失败"); return; }
 
     const prefix1 = folderPrefix + "/";
     const prefix2 = "/" + folderPrefix + "/";
@@ -1167,7 +1365,7 @@ async function delFolder(folderPrefix) {
         return name.startsWith(prefix1) || name.startsWith(prefix2);
     });
 
-    if (targetFiles.length === 0) { alert("文件夹内无文件"); return; }
+    if (targetFiles.length === 0) { await dlgAlert("文件夹内无文件"); return; }
 
     const totalCount = targetFiles.length;
     let currentFinished = 0;
@@ -1228,7 +1426,7 @@ async function downloadFile(fileName, fileUrl) {
         URL.revokeObjectURL(blobUrl);
     } catch (err) {
         console.error('下载失败：', err);
-        alert('下载失败');
+        await dlgAlert('下载失败');
     }
 }
 
@@ -1237,10 +1435,11 @@ async function downloadFile(fileName, fileUrl) {
  * @param {string} folderPrefix
  */
 async function downloadFolderZip(folderPrefix) {
-    if (!confirm(`确定打包【${folderPrefix}】下所有文件为 ZIP？`)) return;
+    const ok = await dlgConfirm('打包下载', `确定打包【${folderPrefix}】下所有文件为 ZIP？`);
+    if (!ok) return;
 
     const { data: allFiles, error } = await sb.from("file_list").select("*");
-    if (error) { console.error("查询文件失败", error); alert("查询文件失败"); return; }
+    if (error) { console.error("查询文件失败", error); await dlgAlert("查询文件失败"); return; }
 
     const prefix1 = folderPrefix + "/";
     const prefix2 = "/" + folderPrefix + "/";
@@ -1249,7 +1448,7 @@ async function downloadFolderZip(folderPrefix) {
         return name.startsWith(prefix1) || name.startsWith(prefix2);
     });
 
-    if (targetFiles.length === 0) { alert("文件夹内无文件"); return; }
+    if (targetFiles.length === 0) { await dlgAlert("文件夹内无文件"); return; }
 
     const totalCount = targetFiles.length;
     let currentFinished = 0;
@@ -1309,7 +1508,7 @@ async function downloadFolderZip(folderPrefix) {
  */
 async function uploadViaFSA() {
     if (!window.showOpenFilePicker) {
-        alert("你的浏览器不支持 File System Access API，请使用最新版 Chrome 或 Edge");
+        await dlgAlert("你的浏览器不支持 File System Access API，请使用最新版 Chrome 或 Edge");
         return;
     }
 
@@ -1319,7 +1518,7 @@ async function uploadViaFSA() {
     } catch (e) {
         if (e.name === 'AbortError') return;   // 用户取消
         console.error("showOpenFilePicker 失败:", e);
-        alert("选择文件失败：" + e.message);
+        await dlgAlert("选择文件失败：" + e.message);
         return;
     }
 
@@ -1338,7 +1537,7 @@ async function uploadViaFSA() {
  */
 async function uploadFolderViaFSA() {
     if (!window.showDirectoryPicker) {
-        alert("你的浏览器不支持 File System Access API，请使用最新版 Chrome 或 Edge");
+        await dlgAlert("你的浏览器不支持 File System Access API，请使用最新版 Chrome 或 Edge");
         return;
     }
 
@@ -1348,7 +1547,7 @@ async function uploadFolderViaFSA() {
     } catch (e) {
         if (e.name === 'AbortError') return;
         console.error("showDirectoryPicker 失败:", e);
-        alert("选择文件夹失败：" + e.message);
+        await dlgAlert("选择文件夹失败：" + e.message);
         return;
     }
 
@@ -1356,7 +1555,7 @@ async function uploadFolderViaFSA() {
     await collectDirFiles(dirHandle, dirHandle.name, items);
 
     if (items.length === 0) {
-        alert("文件夹内没有文件");
+        await dlgAlert("文件夹内没有文件");
         return;
     }
     document.getElementById("folderTip").textContent = `已选 ${items.length} 个文件`;
@@ -1439,6 +1638,757 @@ async function doUploadItems(items, showSpeed) {
         loadFiles();
     }, 800);
 }
+/* ============================================================
+ * 网盘 - 右键菜单 / 剪贴板 / 键盘快捷键
+ * ============================================================ */
+
+/* ============================================================
+ * 网盘 - 多选 / 框选
+ * ============================================================ */
+
+let dragState = null;
+let suppressNextClick = false;
+
+/**
+ * 取当前所有选中的项
+ */
+function getSelectedItems() {
+    const els = document.querySelectorAll('#fileList .fe-item.selected');
+    return Array.from(els).map(el => ({
+        type: el.dataset.type,
+        name: el.dataset.name,
+        id: el.dataset.id,
+        path: el.dataset.path,
+        el
+    }));
+}
+
+/**
+ * 初始化框选
+ */
+function initRubberBand() {
+    const list = document.getElementById('fileList');
+    if (!list) return;
+
+    list.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;              // 只处理左键
+        if (e.target.closest('button')) return;  // 点在按钮上
+        if (e.target.closest('#contextMenu')) return;
+
+        dragState = {
+            startX: e.clientX,
+            startY: e.clientY,
+            activated: false,
+            bandEl: null,
+            additive: e.ctrlKey || e.metaKey || e.shiftKey,
+            startItem: e.target.closest('.fe-item')
+        };
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!dragState) return;
+
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        if (!dragState.activated && Math.hypot(dx, dy) < 5) return;
+
+        if (!dragState.activated) {
+            dragState.activated = true;
+            const band = document.createElement('div');
+            band.className = 'rubber-band';
+            document.body.appendChild(band);
+            dragState.bandEl = band;
+
+            if (!dragState.additive) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+            }
+        }
+
+        const x = Math.min(dragState.startX, e.clientX);
+        const y = Math.min(dragState.startY, e.clientY);
+        const w = Math.abs(dx);
+        const h = Math.abs(dy);
+
+        const band = dragState.bandEl;
+        band.style.left = x + 'px';
+        band.style.top = y + 'px';
+        band.style.width = w + 'px';
+        band.style.height = h + 'px';
+
+        const bandRect = { left: x, top: y, right: x + w, bottom: y + h };
+        list.querySelectorAll('.fe-item').forEach(el => {
+            const r = el.getBoundingClientRect();
+            const hit = !(r.right < bandRect.left || r.left > bandRect.right ||
+                r.bottom < bandRect.top || r.top > bandRect.bottom);
+            if (hit) el.classList.add('selected');
+            else if (!dragState.additive) el.classList.remove('selected');
+        });
+    });
+
+    document.addEventListener('mouseup', e => {
+        if (!dragState) return;
+
+        if (dragState.activated) {
+            if (dragState.bandEl) dragState.bandEl.remove();
+            suppressNextClick = true;
+            setTimeout(() => { suppressNextClick = false; }, 0);
+        } else if (dragState.startItem) {
+            const item = dragState.startItem;
+            if (e.ctrlKey || e.metaKey) {
+                item.classList.toggle('selected');
+            } else {
+                const wasSelected = item.classList.contains('selected');
+                const selectedCount = list.querySelectorAll('.fe-item.selected').length;
+                if (!wasSelected || selectedCount > 1) {
+                    list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                }
+            }
+        } else {
+            if (!e.ctrlKey && !e.metaKey) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+            }
+        }
+
+        dragState = null;
+    });
+}
+/** 剪贴板：{ mode: 'copy'|'cut', entries: [{...}] } */
+let clipboard = null;
+
+/**
+ * 取当前选中的项
+ */
+function getSelectedItem() {
+    const items = getSelectedItems();
+    return items.length > 0 ? items[0] : null;
+}
+
+/**
+ * 在内存文件树里找同目录下是否已有同名文件，有则加 (1)(2)…
+ * @param {string[]} parentPath 目标文件夹路径段
+ * @param {string} relName 相对名字（可能含子目录 "a/b.txt"）
+ */
+function resolveNameConflict(parentPath, relName) {
+    const parts = relName.split('/');
+    const filename = parts.pop();
+    const node = getNodeByPath([...parentPath, ...parts]);
+    if (!node || !node._files[filename]) return relName;
+
+    const dotIdx = filename.lastIndexOf('.');
+    const base = dotIdx > 0 ? filename.slice(0, dotIdx) : filename;
+    const ext = dotIdx > 0 ? filename.slice(dotIdx) : '';
+
+    let i = 1;
+    while (true) {
+        const candidate = `${base} (${i})${ext}`;
+        if (!node._files[candidate]) {
+            parts.push(candidate);
+            return parts.join('/');
+        }
+        i++;
+    }
+}
+
+/**
+ * 复制 / 剪切选中项
+ * @param {boolean} cut true=剪切，false=复制
+ */
+async function copySelection(cut = false) {
+    const sels = getSelectedItems();
+    if (sels.length === 0) return;
+
+    const entries = [];
+    for (const sel of sels) {
+        if (sel.type === 'file') {
+            const file = findFileByStoragePath(sel.path);
+            if (!file) continue;
+            entries.push({
+                originalId: file.id,
+                originalFileName: file.file_name,
+                storagePath: file.storage_path,
+                newRelName: file.displayName
+            });
+        } else {
+            const folderPath = buildFullPath(currentPath, sel.name);
+            const prefix = folderPath + '/';
+            const { data, error } = await sb.from('file_list').select('*');
+            if (error) { await dlgAlert('读取失败：' + error.message); continue; }
+            for (const row of data) {
+                if (!row.file_name.startsWith(prefix)) continue;
+                const rel = row.file_name.slice(folderPath.length + 1);
+                entries.push({
+                    originalId: row.id,
+                    originalFileName: row.file_name,
+                    storagePath: row.storage_path,
+                    newRelName: sel.name + '/' + rel
+                });
+            }
+        }
+    }
+
+    if (entries.length === 0) {
+        console.log('无内容可' + (cut ? '剪切' : '复制'));
+        return;
+    }
+
+    clipboard = { mode: cut ? 'cut' : 'copy', entries };
+    console.log(`已${cut ? '剪切' : '复制'} ${entries.length} 项`);
+}
+
+/**
+ * 粘贴剪贴板内容到当前目录
+ */
+async function pasteHere() {
+    if (!clipboard || clipboard.entries.length === 0) {
+        console.log('剪贴板为空');
+        return;
+    }
+
+    const mode = clipboard.mode;
+    const entries = clipboard.entries.slice();
+
+    for (const entry of entries) {
+        // 冲突处理
+        const safeRel = resolveNameConflict(currentPath, entry.newRelName);
+        const targetFileName = buildFullPath(currentPath, safeRel);
+
+        // 生成新的 storage 路径
+        const ext = (entry.storagePath.split('.').pop() || 'bin');
+        const newStoragePath = `${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
+
+        // Storage 复制
+        const { error: cpErr } = await sb.storage
+            .from('public_netdisk')
+            .copy(entry.storagePath, newStoragePath);
+        if (cpErr) {
+            console.error('Storage 复制失败:', entry.storagePath, cpErr.message);
+            continue;
+        }
+
+        const { data: urlData } = sb.storage.from('public_netdisk').getPublicUrl(newStoragePath);
+        const { error: insErr } = await sb.from('file_list').insert({
+            file_name: targetFileName,
+            file_url: urlData.publicUrl,
+            storage_path: newStoragePath
+        });
+        if (insErr) {
+            console.error('写入 file_list 失败:', insErr.message);
+            await sb.storage.from('public_netdisk').remove([newStoragePath]);
+            continue;
+        }
+
+        // 剪切模式：删原文件
+        if (mode === 'cut') {
+            await sb.from('file_list').delete().eq('id', entry.originalId);
+            await sb.storage.from('public_netdisk').remove([entry.storagePath]);
+        }
+    }
+
+    if (mode === 'cut') clipboard = null;
+    loadFiles();
+}
+
+/**
+ * 重命名选中项（用 delete + insert 绕过缺失的 UPDATE 策略）
+ */
+async function renameSelected() {
+    const sel = getSelectedItem();
+    if (!sel) return;
+
+    const newName = await dlgPrompt('重命名', '请输入新名称', sel.name);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === sel.name) return;
+    if (/[\/\\]/.test(trimmed)) {
+        await dlgAlert('名称不合法', '名称不能包含 / 或 \\');
+        return;
+    }
+
+    if (sel.type === 'file') {
+        const file = findFileByStoragePath(sel.path);
+        if (!file) return;
+        const oldName = file.file_name;
+        const parentDir = oldName.includes('/') ? oldName.slice(0, oldName.lastIndexOf('/')) : '';
+        const newPath = parentDir ? parentDir + '/' + trimmed : trimmed;
+
+        const { error: delErr } = await sb.from('file_list').delete().eq('id', file.id);
+        if (delErr) { await dlgAlert('重命名失败', delErr.message); return; }
+
+        const { error: insErr } = await sb.from('file_list').insert({
+            file_name: newPath,
+            file_url: file.file_url,
+            storage_path: file.storage_path
+        });
+        if (insErr) {
+            await sb.from('file_list').insert({
+                file_name: file.file_name,
+                file_url: file.file_url,
+                storage_path: file.storage_path
+            });
+            await dlgAlert('重命名失败', insErr.message);
+            return;
+        }
+    } else {
+        const oldPrefix = buildFullPath(currentPath, sel.name);
+        const newPrefix = buildFullPath(currentPath, trimmed);
+        const { data, error } = await sb.from('file_list').select('*');
+        if (error) { await dlgAlert('读取失败', error.message); return; }
+
+        const prefix = oldPrefix + '/';
+        const targets = data.filter(r => r.file_name && r.file_name.startsWith(prefix));
+        if (targets.length === 0) { await dlgAlert('提示', '文件夹内无文件'); return; }
+
+        const ids = targets.map(r => r.id);
+        const { error: delErr } = await sb.from('file_list').delete().in('id', ids);
+        if (delErr) { await dlgAlert('重命名失败', delErr.message); return; }
+
+        const newRows = targets.map(r => ({
+            file_name: newPrefix + r.file_name.slice(oldPrefix.length),
+            file_url: r.file_url,
+            storage_path: r.storage_path
+        }));
+        const { error: insErr } = await sb.from('file_list').insert(newRows);
+        if (insErr) {
+            await sb.from('file_list').insert(targets.map(r => ({
+                file_name: r.file_name,
+                file_url: r.file_url,
+                storage_path: r.storage_path
+            })));
+            await dlgAlert('重命名失败', insErr.message);
+            return;
+        }
+    }
+
+    loadFiles();
+}
+
+/**
+ * 删除选中项
+ */
+async function deleteSelected() {
+    const sels = getSelectedItems();
+    if (sels.length === 0) return;
+
+    let msg;
+    if (sels.length === 1) {
+        msg = sels[0].type === 'file'
+            ? '确定删除该文件？'
+            : `确定删除【${sels[0].name}】及其内部所有文件吗？该操作不可恢复！`;
+    } else {
+        msg = `确定删除选中的 ${sels.length} 项吗？该操作不可恢复！`;
+    }
+
+    const ok = await dlgConfirm('删除', msg, true);
+    if (!ok) return;
+
+    for (const sel of sels) {
+        if (sel.type === 'file') {
+            const file = findFileByStoragePath(sel.path);
+            if (!file) continue;
+            const { error: dbErr } = await sb.from('file_list').delete().eq('id', file.id);
+            if (dbErr) { console.error(dbErr); continue; }
+            await sb.storage.from('public_netdisk').remove([file.storage_path]);
+        } else {
+            const folderPrefix = buildFullPath(currentPath, sel.name);
+            const { data: allFiles, error } = await sb.from('file_list').select('*');
+            if (error) { console.error(error); continue; }
+
+            const prefix1 = folderPrefix + '/';
+            const prefix2 = '/' + folderPrefix + '/';
+            const targets = allFiles.filter(r => {
+                const n = r.file_name || '';
+                return n.startsWith(prefix1) || n.startsWith(prefix2);
+            });
+            if (targets.length === 0) continue;
+
+            const paths = targets.map(r => r.storage_path);
+            const ids = targets.map(r => r.id);
+            for (let i = 0; i < paths.length; i += 5) {
+                await sb.storage.from('public_netdisk').remove(paths.slice(i, i + 5));
+                await sb.from('file_list').delete().in('id', ids.slice(i, i + 5));
+            }
+        }
+    }
+
+    loadFiles();
+}
+/* ---------- 新建文件 / 文件夹 ---------- */
+
+/**
+ * 新建空文件
+ */
+async function createNewFile() {
+    const name = await dlgPrompt('新建文件', '请输入文件名（含扩展名）', 'untitled.txt');
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (/[\/\\]/.test(trimmed)) {
+        await dlgAlert('名称不合法', '文件名不能包含 / 或 \\');
+        return;
+    }
+
+    const node = getNodeByPath(currentPath);
+    if (node && node._files[trimmed]) {
+        await dlgAlert('已存在', '当前目录已存在同名文件');
+        return;
+    }
+
+    const fullPath = buildFullPath(currentPath, trimmed);
+    const file = new File([""], trimmed, { type: "text/plain" });
+    const ok = await uploadSingleFileWithPath(file, fullPath);
+    if (!ok) {
+        await dlgAlert('创建失败', '创建文件失败，请重试');
+        return;
+    }
+    loadFiles();
+}
+
+/**
+ * 新建文件夹（通过写一个占位文件 .gitkeep 让目录出现在列表里）
+ */
+async function createNewFolder() {
+    const name = await dlgPrompt('新建文件夹', '请输入文件夹名', '新建文件夹');
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (/[\/\\]/.test(trimmed)) {
+        await dlgAlert('名称不合法', '文件夹名不能包含 / 或 \\');
+        return;
+    }
+
+    const node = getNodeByPath(currentPath);
+    if (node && node._children[trimmed]) {
+        await dlgAlert('已存在', '当前目录已存在同名文件夹');
+        return;
+    }
+
+    const fullPath = buildFullPath(currentPath, trimmed + '/' + FOLDER_PLACEHOLDER);
+    const file = new File([""], FOLDER_PLACEHOLDER, { type: "text/plain" });
+    const ok = await uploadSingleFileWithPath(file, fullPath);
+    if (!ok) {
+        await dlgAlert('创建失败', '创建文件夹失败，请重试');
+        return;
+    }
+    loadFiles();
+}
+/* ---------- 右键菜单 ---------- */
+
+function ensureContextMenu() {
+    let menu = document.getElementById('contextMenu');
+    if (menu) return menu;
+    menu = document.createElement('div');
+    menu.id = 'contextMenu';
+    menu.className = 'context-menu';
+    document.body.appendChild(menu);
+    return menu;
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById('contextMenu');
+    if (menu) menu.classList.remove('show');
+}
+
+/**
+ * 显示右键菜单
+ * @param {number} x
+ * @param {number} y
+ */
+function showContextMenu(x, y) {
+    const menu = ensureContextMenu();
+    const sels = getSelectedItems();
+    const sel = sels.length > 0 ? sels[0] : null;
+    const n = sels.length;
+
+    /** @type {Array<{label?:string, action?:Function, sep?:boolean, disabled?:boolean, danger?:boolean, shortcut?:string}>} */
+    const items = [];
+
+    if (sel) {
+        if (n === 1) {
+            if (sel.type === 'file') {
+                items.push({
+                    label: '打开', shortcut: '双击',
+                    action: () => {
+                        const f = findFileByStoragePath(sel.path);
+                        if (f) openPreview(f);
+                    }
+                });
+                items.push({
+                    label: '下载',
+                    action: () => {
+                        const f = findFileByStoragePath(sel.path);
+                        if (f) downloadFile(f.displayName, f.file_url);
+                    }
+                });
+            } else {
+                items.push({
+                    label: '打开',
+                    action: () => { currentPath.push(sel.name); renderExplorer(); }
+                });
+            }
+        } else {
+            items.push({ label: `已选 ${n} 项`, disabled: true });
+        }
+        items.push({ sep: true });
+        if (n === 1) {
+            items.push({ label: '重命名', shortcut: 'F2', action: renameSelected });
+        }
+        items.push({ label: n > 1 ? `复制 ${n} 项` : '复制', shortcut: 'Ctrl+C', action: () => copySelection(false) });
+        items.push({ label: n > 1 ? `剪切 ${n} 项` : '剪切', shortcut: 'Ctrl+X', action: () => copySelection(true) });
+        items.push({ sep: true });
+        items.push({ label: n > 1 ? `删除 ${n} 项` : '删除', shortcut: 'Del', danger: true, action: deleteSelected });
+    } else {
+        items.push({ label: '新建文件', action: createNewFile });
+        items.push({ label: '新建文件夹', action: createNewFolder });
+        items.push({ sep: true });
+        items.push({
+            label: '粘贴',
+            shortcut: 'Ctrl+V',
+            disabled: !clipboard || clipboard.entries.length === 0,
+            action: pasteHere
+        });
+        items.push({ sep: true });
+        items.push({ label: '刷新', action: () => loadFiles() });
+    }
+
+    menu.innerHTML = '';
+    for (const it of items) {
+        if (it.sep) {
+            const sep = document.createElement('div');
+            sep.className = 'context-menu-sep';
+            menu.appendChild(sep);
+            continue;
+        }
+        const el = document.createElement('div');
+        el.className = 'context-menu-item';
+        if (it.disabled) el.classList.add('disabled');
+        if (it.danger) el.classList.add('danger');
+        el.innerHTML = `<span>${it.label}</span>` +
+            (it.shortcut ? `<span class="shortcut">${it.shortcut}</span>` : '');
+        if (!it.disabled && it.action) {
+            el.addEventListener('click', ev => {
+                ev.stopPropagation();
+                hideContextMenu();
+                it.action();
+            });
+        }
+        menu.appendChild(el);
+    }
+
+    // 先显示再测量宽高，避免超出窗口
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    menu.classList.add('show');
+    const rect = menu.getBoundingClientRect();
+    const px = Math.min(x, window.innerWidth - rect.width - 8);
+    const py = Math.min(y, window.innerHeight - rect.height - 8);
+    menu.style.left = px + 'px';
+    menu.style.top = py + 'px';
+}
+/**
+ * 判断坐标 (x, y) 是否落在元素的文本实际渲染范围内
+ * @param {HTMLElement} el
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+function isPointOnText(el, x, y) {
+    if (!el || !el.textContent) return false;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const rects = range.getClientRects();
+    for (const r of rects) {
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+    }
+    return false;
+}
+/**
+ * 初始化右键菜单
+ */
+function initContextMenu() {
+    ensureContextMenu();
+
+    const list = document.getElementById('fileList');
+    list.addEventListener('contextmenu', e => {
+        e.preventDefault();
+
+        const item = e.target.closest('.fe-item');
+
+        // 判断点在不在"实质内容"上
+        let onContent = false;
+        if (item) {
+            // 图标、按钮：直接算内容
+            if (e.target.closest('.fe-icon, .fe-btn')) {
+                onContent = true;
+            } else {
+                // 文件名 / 大小 / 时间：需检查点是否落在文字本身上
+                const textEl = e.target.closest('.fe-name, .fe-meta');
+                if (textEl && isPointOnText(textEl, e.clientX, e.clientY)) {
+                    onContent = true;
+                }
+            }
+        }
+
+        if (item && onContent) {
+            // 点到的项已在选中集合里 → 保留现有选中，做批量操作
+            if (!item.classList.contains('selected')) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+            }
+        } else {
+            // 右键空白或条目空白部分 → 清空选中，出空白菜单
+            list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+        }
+
+        showContextMenu(e.clientX, e.clientY);
+    });
+
+    // 点其它地方关掉菜单
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#contextMenu')) hideContextMenu();
+    });
+    document.addEventListener('scroll', hideContextMenu, true);
+    window.addEventListener('resize', hideContextMenu);
+}
+
+/* ---------- 键盘快捷键 ---------- */
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', e => {
+        if (e.target.matches('input, textarea, [contenteditable="true"]')) return;
+        if (document.querySelector('#textViewer.show')) return;
+        if (document.querySelector('#dialog.show')) return;
+        const sel = getSelectedItem();
+
+        if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+            const k = e.key.toLowerCase();
+            if (k === 'a') {
+                e.preventDefault();
+                const list = document.getElementById('fileList');
+                if (list) {
+                    list.querySelectorAll('.fe-item').forEach(el => el.classList.add('selected'));
+                }
+                return;
+            }
+            if (k === 'c') {
+                if (sel) { e.preventDefault(); copySelection(false); }
+            } else if (k === 'x') {
+                if (sel) { e.preventDefault(); copySelection(true); }
+            } else if (k === 'v') {
+                e.preventDefault();
+                pasteHere();
+            }
+        } else if (e.key === 'Delete') {
+            if (sel) { e.preventDefault(); deleteSelected(); }
+        } else if (e.key === 'F2') {
+            if (sel) { e.preventDefault(); renameSelected(); }
+        } else if (e.key === 'Escape') {
+            hideContextMenu();
+        }
+    });
+}
+/* ============================================================
+ * 网盘 - 搜索
+ * ============================================================ */
+
+let searchQuery = '';
+
+/**
+ * 递归收集文件树里所有文件（带完整路径）
+ * @param {any} node
+ * @param {string} basePath
+ * @param {Array} out
+ */
+function collectAllFiles(node, basePath, out) {
+    for (const name of Object.keys(node._children)) {
+        collectAllFiles(node._children[name], basePath ? basePath + '/' + name : name, out);
+    }
+    for (const f of Object.values(node._files)) {
+        out.push({
+            ...f,
+            fullPath: basePath ? basePath + '/' + f.displayName : f.displayName
+        });
+    }
+}
+
+/**
+ * 按 storage_path 从文件树查找文件
+ * @param {string} storagePath
+ */
+function findFileByStoragePath(storagePath) {
+    if (!storagePath) return null;
+    const all = [];
+    collectAllFiles(fileTree, '', all);
+    return all.find(f => f.storage_path === storagePath) || null;
+}
+
+/**
+ * 渲染搜索结果
+ */
+function renderSearchResults(wrap, query) {
+    const all = [];
+    collectAllFiles(fileTree, '', all);
+
+    const q = query.toLowerCase();
+    const matched = all.filter(f =>
+        f.displayName.toLowerCase().includes(q) ||
+        f.fullPath.toLowerCase().includes(q)
+    );
+
+    if (matched.length === 0) {
+        wrap.innerHTML = `<div class="nofile">没有匹配的文件</div>`;
+        return;
+    }
+
+    matched.sort((a, b) => a.fullPath.localeCompare(b.fullPath, 'zh'));
+
+    let html = `<div class="search-hint">找到 ${matched.length} 个文件</div>`;
+    for (const f of matched) {
+        const sizeText = formatBytes(f._size || 0);
+        const mtimeText = formatTime(f._mtime);
+        html += `
+    <div class="fe-item fe-file"
+         data-type="file"
+         data-name="${escapeHtml(f.displayName)}"
+         data-id="${escapeHtml(f.id)}"
+         data-path="${escapeHtml(f.storage_path)}">
+        <span class="fe-icon"><img src="${getFileIconUrl(f.displayName)}" alt=""
+            onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+        <span class="fe-name">${escapeHtml(f.displayName)}</span>
+        <span class="search-path">${escapeHtml(f.fullPath)}</span>
+        <span class="fe-meta fe-size">${sizeText}</span>
+        <span class="fe-meta fe-mtime">${mtimeText}</span>
+        <span class="fe-actions">
+            <button class="fe-btn" data-action="open" type="button">打开</button>
+            <button class="fe-btn" data-action="download" type="button">下载</button>
+            <button class="fe-btn del" data-action="del-file" type="button">删除</button>
+        </span>
+    </div>`;
+    }
+    wrap.innerHTML = html;
+}
+
+/**
+ * 初始化搜索框
+ */
+function initSearch() {
+    const input = document.getElementById('searchInput');
+    if (!input) return;
+
+    input.addEventListener('input', () => {
+        searchQuery = input.value.trim();
+        renderFileList();
+    });
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            input.value = '';
+            searchQuery = '';
+            renderFileList();
+            input.blur();
+        }
+    });
+}
 
 /* ============================================================
  * 初始化
@@ -1447,5 +2397,9 @@ async function doUploadItems(items, showSpeed) {
 initTabs();
 initExplorerEvents();
 initTextViewer();
+initContextMenu();
+initKeyboardShortcuts();
+initSearch();
+initRubberBand();
 loadMessages();
 loadFiles();

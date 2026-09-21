@@ -61,11 +61,28 @@
                     <button class="nav-btn" id="btnRefresh" type="button" title="刷新">⟳</button>
                 </div>
 
+                <!-- 搜索框 -->
+                <div class="search-bar">
+                    <input type="search" id="searchInput" placeholder="🔍 搜索文件名或路径…" autocomplete="off">
+                </div>
+
                 <!-- 文件列表 -->
                 <div id="fileList"></div>
             </div>
         </div>
     </main>
+    <!-- 通用弹窗 -->
+    <div id="dialog" class="dialog-overlay">
+        <div class="dialog-box">
+            <div class="dialog-title" id="dialogTitle"></div>
+            <div class="dialog-message" id="dialogMessage"></div>
+            <input type="text" id="dialogInput" class="dialog-input" style="display:none">
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="dialogCancel" type="button">取消</button>
+                <button class="dialog-btn primary" id="dialogOk" type="button">确定</button>
+            </div>
+        </div>
+    </div>
     <!-- 文本查看器 -->
     <div id="textViewer" class="viewer-overlay">
         <div class="viewer-box">
