@@ -3,6 +3,160 @@ const SUPABASE_URL = "https://ekphociqviwojbonbcbd.supabase.co";
 const ANON_KEY = "sb_publishable_ebvcoe-OiDqlZJTkIsvZ1g_KsDf4sSU";
 const sb = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
 /* ============================================================
+ * 文件图标（vscode-icons）
+ * ============================================================ */
+
+const VSC_ICON_CDN = 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/';
+const DEFAULT_FILE_ICON = VSC_ICON_CDN + 'default_file.svg';
+const DEFAULT_FOLDER_ICON = VSC_ICON_CDN + 'default_folder.svg';
+
+/** 扩展名 → vscode-icons 文件名 */
+const FILE_ICON_SVG_MAP = {
+    // 脚本 / 编程语言
+    js: 'file_type_js.svg',
+    mjs: 'file_type_js.svg',
+    cjs: 'file_type_js.svg',
+    jsx: 'file_type_reactjs.svg',
+    ts: 'file_type_typescript.svg',
+    tsx: 'file_type_reactts.svg',
+    py: 'file_type_python.svg',
+    java: 'file_type_java.svg',
+    c: 'file_type_c.svg',
+    h: 'file_type_c.svg',
+    cpp: 'file_type_cpp.svg',
+    hpp: 'file_type_cpp.svg',
+    cc: 'file_type_cpp.svg',
+    cs: 'file_type_csharp.svg',
+    go: 'file_type_go.svg',
+    rs: 'file_type_rust.svg',
+    rb: 'file_type_ruby.svg',
+    php: 'file_type_php.svg',
+    swift: 'file_type_swift.svg',
+    kt: 'file_type_kotlin.svg',
+    kts: 'file_type_kotlin.svg',
+    scala: 'file_type_scala.svg',
+    lua: 'file_type_lua.svg',
+    dart: 'file_type_dartlang.svg',
+    r: 'file_type_r.svg',
+    pl: 'file_type_perl.svg',
+    jl: 'file_type_julia.svg',
+    zig: 'file_type_zig.svg',
+    nim: 'file_type_nim.svg',
+    // Shell
+    sh: 'file_type_shell.svg',
+    bash: 'file_type_shell.svg',
+    zsh: 'file_type_shell.svg',
+    ps1: 'file_type_powershell.svg',
+    bat: 'file_type_bat.svg',
+    cmd: 'file_type_bat.svg',
+    // Web
+    html: 'file_type_html.svg',
+    htm: 'file_type_html.svg',
+    css: 'file_type_css.svg',
+    scss: 'file_type_scss.svg',
+    less: 'file_type_less.svg',
+    vue: 'file_type_vue.svg',
+    svelte: 'file_type_svelte.svg',
+    // 数据 / 配置
+    json: 'file_type_json.svg',
+    json5: 'file_type_json.svg',
+    yaml: 'file_type_yaml.svg',
+    yml: 'file_type_yaml.svg',
+    toml: 'file_type_toml.svg',
+    ini: 'file_type_ini.svg',
+    conf: 'file_type_config.svg',
+    cfg: 'file_type_config.svg',
+    env: 'file_type_dotenv.svg',
+    properties: 'file_type_config.svg',
+    lock: 'file_type_lock.svg',
+    xml: 'file_type_xml.svg',
+    svg: 'file_type_svg.svg',
+    sql: 'file_type_sql.svg',
+    db: 'file_type_sql.svg',
+    sqlite: 'file_type_sql.svg',
+    graphql: 'file_type_graphql.svg',
+    gql: 'file_type_graphql.svg',
+    proto: 'file_type_proto.svg',
+    // 文档 / 文本
+    md: 'file_type_markdown.svg',
+    markdown: 'file_type_markdown.svg',
+    txt: 'file_type_text.svg',
+    log: 'file_type_log.svg',
+    rst: 'file_type_rst.svg',
+    tex: 'file_type_tex.svg',
+    pdf: 'file_type_pdf.svg',
+    doc: 'file_type_word.svg',
+    docx: 'file_type_word.svg',
+    xls: 'file_type_excel.svg',
+    xlsx: 'file_type_excel.svg',
+    csv: 'file_type_excel.svg',
+    tsv: 'file_type_excel.svg',
+    ppt: 'file_type_powerpoint.svg',
+    pptx: 'file_type_powerpoint.svg',
+    // 图片
+    png: 'file_type_image.svg',
+    jpg: 'file_type_image.svg',
+    jpeg: 'file_type_image.svg',
+    gif: 'file_type_image.svg',
+    webp: 'file_type_image.svg',
+    bmp: 'file_type_image.svg',
+    ico: 'file_type_image.svg',
+    tif: 'file_type_image.svg',
+    tiff: 'file_type_image.svg',
+    psd: 'file_type_photoshop.svg',
+    ai: 'file_type_ai.svg',
+    // 音频 / 视频
+    mp3: 'file_type_audio.svg',
+    wav: 'file_type_audio.svg',
+    flac: 'file_type_audio.svg',
+    ogg: 'file_type_audio.svg',
+    m4a: 'file_type_audio.svg',
+    aac: 'file_type_audio.svg',
+    mp4: 'file_type_video.svg',
+    avi: 'file_type_video.svg',
+    mov: 'file_type_video.svg',
+    mkv: 'file_type_video.svg',
+    webm: 'file_type_video.svg',
+    flv: 'file_type_video.svg',
+    wmv: 'file_type_video.svg',
+    // 压缩包
+    zip: 'file_type_zip.svg',
+    rar: 'file_type_zip.svg',
+    '7z': 'file_type_zip.svg',
+    tar: 'file_type_zip.svg',
+    gz: 'file_type_zip.svg',
+    bz2: 'file_type_zip.svg',
+    xz: 'file_type_zip.svg',
+    iso: 'file_type_iso.svg',
+    // 可执行 / 安装包
+    exe: 'file_type_exe.svg',
+    msi: 'file_type_exe.svg',
+    dmg: 'file_type_dmg.svg',
+    apk: 'file_type_android.svg',
+    deb: 'file_type_debian.svg',
+    rpm: 'file_type_redhat.svg',
+    // 字体
+    ttf: 'file_type_font.svg',
+    otf: 'file_type_font.svg',
+    woff: 'file_type_font.svg',
+    woff2: 'file_type_font.svg',
+    eot: 'file_type_font.svg',
+};
+
+/**
+ * 根据文件名返回图标 URL
+ * @param {string} filename
+ * @returns {string}
+ */
+function getFileIconUrl(filename) {
+    const name = String(filename || '').toLowerCase();
+    const idx = name.lastIndexOf('.');
+    if (idx === -1 || idx === 0) return DEFAULT_FILE_ICON;
+    const ext = name.slice(idx + 1);
+    const file = FILE_ICON_SVG_MAP[ext];
+    return file ? VSC_ICON_CDN + file : DEFAULT_FILE_ICON;
+}
+/* ============================================================
  * 文本查看器
  * ============================================================ */
 /** 扩展名 → highlight.js 语言名 */
@@ -149,6 +303,269 @@ function initTextViewer() {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && overlay.classList.contains('show')) closeTextViewer();
     });
+}
+/* ============================================================
+ * 其他预览类型判断
+ * ============================================================ */
+
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif']);
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov', 'mkv', 'm4v']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac', 'opus']);
+const OFFICE_EXTS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
+
+function getExt(filename) {
+    const name = String(filename || '').toLowerCase();
+    const idx = name.lastIndexOf('.');
+    if (idx === -1 || idx === 0) return '';
+    return name.slice(idx + 1);
+}
+
+function isImageFile(filename) { return IMAGE_EXTS.has(getExt(filename)); }
+function isVideoFile(filename) { return VIDEO_EXTS.has(getExt(filename)); }
+function isAudioFile(filename) { return AUDIO_EXTS.has(getExt(filename)); }
+function isPdfFile(filename) { return getExt(filename) === 'pdf'; }
+function isOfficeFile(filename) { return OFFICE_EXTS.has(getExt(filename)); }
+
+/**
+ * 判断文件是否可以预览
+ */
+function canPreviewFile(filename) {
+    return isTextFile(filename) || isZipFile(filename) ||
+        isImageFile(filename) || isVideoFile(filename) ||
+        isAudioFile(filename) || isPdfFile(filename) ||
+        isOfficeFile(filename);
+}
+/* ============================================================
+ * ZIP 预览
+ * ============================================================ */
+
+/** 判断是否是 zip */
+function isZipFile(filename) {
+    const name = String(filename || '').toLowerCase();
+    return name.endsWith('.zip') || name.endsWith('.jar') || name.endsWith('.apk') ||
+        name.endsWith('.docx') || name.endsWith('.xlsx') || name.endsWith('.pptx') ||
+        name.endsWith('.epub');
+}
+
+/**
+ * 格式化字节
+ * @param {number} bytes
+ */
+function formatBytes(bytes) {
+    if (!bytes || bytes < 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let n = bytes;
+    while (n >= 1024 && i < units.length - 1) {
+        n /= 1024;
+        i++;
+    }
+    return `${n.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+}
+
+/**
+ * 打开 zip 预览
+ * @param {{displayName: string, file_url: string}} file
+ */
+async function openZipViewer(file) {
+    viewerCurrentFile = file;
+    const overlay = document.getElementById('textViewer');
+    const title = document.getElementById('viewerTitle');
+    const content = document.getElementById('viewerContent');
+
+    title.textContent = file.displayName || 'ZIP 预览';
+    content.className = 'viewer-content';
+    content.style.fontSize = '';
+    content.textContent = '正在读取压缩包…';
+    overlay.classList.add('show');
+
+    try {
+        const res = await fetch(file.file_url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+
+        const zip = await JSZip.loadAsync(blob);
+
+        // ---------- 1. 收集所有条目 ----------
+        /** @type {Array<{name:string, dir:boolean, size:number, compressed:number}>} */
+        const entries = [];
+        zip.forEach((relativePath, entry) => {
+            const data = entry._data || {};
+            entries.push({
+                name: relativePath,
+                dir: entry.dir,
+                size: data.uncompressedSize || 0,
+                compressed: data.compressedSize || 0
+            });
+        });
+
+        // ---------- 2. 建树（自动补全中间目录） ----------
+        const tree = { children: {}, files: [] };
+        for (const e of entries) {
+            const clean = e.name.replace(/\/+$/, '');
+            if (!clean) continue;
+            const parts = clean.split('/');
+
+            if (e.dir) {
+                let node = tree;
+                for (const p of parts) {
+                    if (!node.children[p]) node.children[p] = { children: {}, files: [] };
+                    node = node.children[p];
+                }
+            } else {
+                const filename = parts.pop();
+                let node = tree;
+                for (const p of parts) {
+                    if (!node.children[p]) node.children[p] = { children: {}, files: [] };
+                    node = node.children[p];
+                }
+                node.files.push({ ...e, name: filename });
+            }
+        }
+
+        // ---------- 3. 统计 ----------
+        let fileCount = 0, folderCount = 0, totalSize = 0, totalCompressed = 0;
+        (function walk(node) {
+            for (const name of Object.keys(node.children)) {
+                folderCount++;
+                walk(node.children[name]);
+            }
+            for (const f of node.files) {
+                fileCount++;
+                totalSize += f.size;
+                totalCompressed += f.compressed;
+            }
+        })(tree);
+
+        // ---------- 4. 前序展开成平铺列表（带 depth） ----------
+        const rows = [];
+        (function walk(node, depth) {
+            const folderNames = Object.keys(node.children).sort((a, b) => a.localeCompare(b, 'zh'));
+            for (const name of folderNames) {
+                rows.push({ dir: true, name, depth, size: 0, compressed: 0 });
+                walk(node.children[name], depth + 1);
+            }
+            const files = node.files.slice().sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+            for (const f of files) {
+                rows.push({ dir: false, name: f.name, depth, size: f.size, compressed: f.compressed });
+            }
+        })(tree, 0);
+
+        // ---------- 5. 渲染 ----------
+        let rowsHtml = '';
+        for (const e of rows) {
+            const icon = e.dir ? '📁' : '📄';
+            const sizeText = e.dir ? '' : formatBytes(e.size);
+            const ratio = (!e.dir && e.size > 0)
+                ? ((1 - e.compressed / e.size) * 100).toFixed(0) + '%'
+                : '';
+            rowsHtml += `
+        <tr>
+            <td class="zip-name" style="padding-left:${e.depth * 20 + 8}px">
+                <span class="zip-icon">${icon}</span>${escapeHtml(e.name)}
+            </td>
+            <td class="zip-size">${sizeText}</td>
+            <td class="zip-ratio">${ratio}</td>
+        </tr>`;
+        }
+
+        const ratioTotal = totalSize > 0
+            ? ((1 - totalCompressed / totalSize) * 100).toFixed(1) + '%'
+            : '—';
+
+        content.innerHTML = `
+            <div class="zip-summary">
+                <div><b>文件数</b>：${fileCount}</div>
+                <div><b>文件夹数</b>：${folderCount}</div>
+                <div><b>原始大小</b>：${formatBytes(totalSize)}</div>
+                <div><b>压缩后</b>：${formatBytes(totalCompressed)}</div>
+                <div><b>压缩率</b>：${ratioTotal}</div>
+            </div>
+            <table class="zip-table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>大小</th>
+                        <th>压缩率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        `;
+    } catch (err) {
+        console.error('ZIP 预览失败', err);
+        content.textContent = 'ZIP 读取失败：' + err.message;
+    }
+}
+/* ============================================================
+ * 各类型预览
+ * ============================================================ */
+
+function resetViewer(file, subTitle) {
+    viewerCurrentFile = file;
+    const overlay = document.getElementById('textViewer');
+    const title = document.getElementById('viewerTitle');
+    const content = document.getElementById('viewerContent');
+    title.textContent = file.displayName || file.file_name || subTitle || '预览';
+    content.className = 'viewer-content';
+    content.innerHTML = '';
+    content.style.fontSize = '';
+    overlay.classList.add('show');
+    return content;
+}
+
+/** 图片预览 */
+function openImagePreview(file) {
+    const content = resetViewer(file);
+    content.innerHTML = `<img class="viewer-image" src="${file.file_url}" alt="">`;
+}
+
+/** PDF 预览（浏览器原生） */
+function openPdfPreview(file) {
+    const content = resetViewer(file);
+    content.innerHTML = `<iframe class="viewer-frame" src="${file.file_url}"></iframe>`;
+}
+
+/** 视频预览 */
+function openVideoPreview(file) {
+    const content = resetViewer(file);
+    content.innerHTML = `<video class="viewer-video" src="${file.file_url}" controls preload="metadata"></video>`;
+}
+
+/** 音频预览 */
+function openAudioPreview(file) {
+    const content = resetViewer(file);
+    content.innerHTML = `
+        <div class="viewer-audio-wrap">
+            <div class="viewer-audio-icon">🎵</div>
+            <div class="viewer-audio-name">${escapeHtml(file.displayName || '')}</div>
+            <audio class="viewer-audio" src="${file.file_url}" controls preload="metadata"></audio>
+        </div>`;
+}
+
+/** Office 预览（微软在线查看器） */
+function openOfficePreview(file) {
+    const content = resetViewer(file);
+    const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.file_url)}`;
+    content.innerHTML = `
+        <iframe class="viewer-frame" src="${viewerUrl}"
+                allowfullscreen></iframe>
+        <div class="viewer-hint">若长时间空白，说明该文件无法在线预览，请直接下载</div>`;
+}
+
+/** 统一入口 */
+function openPreview(file) {
+    const name = file.displayName || file.file_name || '';
+    if (isZipFile(name)) return openZipViewer(file);
+    if (isTextFile(name)) return openTextViewer(file);
+    if (isImageFile(name)) return openImagePreview(file);
+    if (isPdfFile(name)) return openPdfPreview(file);
+    if (isVideoFile(name)) return openVideoPreview(file);
+    if (isAudioFile(name)) return openAudioPreview(file);
+    if (isOfficeFile(name)) return openOfficePreview(file);
+    downloadFile(name, file.file_url);
 }
 /* ============================================================
  * 通用工具
@@ -367,7 +784,7 @@ function renderFileList() {
     for (const name of folders) {
         html += `
         <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(name)}">
-            <span class="fe-icon">📁</span>
+            <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
             <span class="fe-name">${escapeHtml(name)}</span>
             <span class="fe-actions">
                 <button class="fe-btn" data-action="zip" type="button">打包</button>
@@ -377,7 +794,7 @@ function renderFileList() {
     }
 
     for (const file of files) {
-        const canOpen = isTextFile(file.displayName);
+        const canOpen = canPreviewFile(file.displayName);
         const openBtn = canOpen
             ? `<button class="fe-btn" data-action="open" type="button">打开</button>`
             : '';
@@ -387,7 +804,8 @@ function renderFileList() {
          data-name="${escapeHtml(file.displayName)}"
          data-id="${escapeHtml(file.id)}"
          data-path="${escapeHtml(file.storage_path)}">
-        <span class="fe-icon">📄</span>
+        <span class="fe-icon"><img src="${getFileIconUrl(file.displayName)}" alt=""
+        onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
         <span class="fe-name">${escapeHtml(file.displayName)}</span>
         <span class="fe-actions">
             ${openBtn}
@@ -449,7 +867,7 @@ function initExplorerEvents() {
                 if (file) downloadFile(file.displayName, file.file_url);
             } else if (action === "open") {
                 const file = findCurrentFile(name);
-                if (file) openTextViewer(file);
+                if (file) openPreview(file);
             } else if (action === "del-file") {
                 delFile(item.dataset.id, item.dataset.path);
             }
@@ -472,10 +890,10 @@ function initExplorerEvents() {
         }
         const file = findCurrentFile(item.dataset.name);
         if (!file) return;
-        if (isTextFile(file.displayName)) {
-            openTextViewer(file);       // 文本 → 内置查看器
+        if (canPreviewFile(file.displayName)) {
+            openPreview(file);
         } else {
-            downloadFile(file.displayName, file.file_url);  // 其它 → 直接下载
+            downloadFile(file.displayName, file.file_url);
         }
     });
 
