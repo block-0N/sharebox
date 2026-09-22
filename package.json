@@ -1,0 +1,33 @@
+{
+    "name": "my-electron-app",
+    "version": "1.0.0",
+    "description": "My Electron app",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dist": "electron-builder"
+    },
+    "devDependencies": {
+        "electron": "^33.0.0",
+        "electron-builder": "^26.0.0"
+    },
+    "build": {
+        "appId": "com.example.myapp",
+        "productName": "MyApp",
+        "files": [
+            "index.html",
+            "auth.js",
+            "style.css",
+            "main.js"
+        ],
+        "win": {
+            "target": "nsis"
+        },
+        "mac": {
+            "target": "dmg"
+        },
+        "linux": {
+            "target": "AppImage"
+        }
+    }
+}

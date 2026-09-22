@@ -1,0 +1,29 @@
+name: Build Electron Installer
+
+on:
+  workflow_dispatch:        # 关键：允许通过 gh workflow run 手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest  # 如需同时打包 macOS/Linux，改用 matrix 策略
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npx electron-builder --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-installer
+          path: dist/
