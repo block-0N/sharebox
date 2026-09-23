@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -37,23 +37,88 @@ function startServer() {
     });
 }
 
+function buildMenu() {
+    const template = [
+        {
+            label: '文件',
+            submenu: [
+                { label: '重新加载', role: 'reload' },
+                { label: '强制重新加载', role: 'forceReload' },
+                { label: '开发者工具', role: 'toggleDevTools' },
+                { type: 'separator' },
+                { label: '退出', role: 'quit' }
+            ]
+        },
+        {
+            label: '编辑',
+            submenu: [
+                { label: '撤销', role: 'undo' },
+                { label: '重做', role: 'redo' },
+                { type: 'separator' },
+                { label: '剪切', role: 'cut' },
+                { label: '复制', role: 'copy' },
+                { label: '粘贴', role: 'paste' },
+                { label: '全选', role: 'selectAll' }
+            ]
+        },
+        {
+            label: '视图',
+            submenu: [
+                { label: '放大', role: 'zoomIn' },
+                { label: '缩小', role: 'zoomOut' },
+                { label: '重置缩放', role: 'resetZoom' },
+                { type: 'separator' },
+                { label: '全屏', role: 'togglefullscreen' }
+            ]
+        },
+        {
+            label: '窗口',
+            submenu: [
+                { label: '最小化', role: 'minimize' },
+                { label: '关闭', role: 'close' }
+            ]
+        }
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 async function createWindow() {
     await startServer();
+
     const win = new BrowserWindow({
         width: 1100,
         height: 750,
         minWidth: 800,
         minHeight: 600,
+        icon: path.join(__dirname, 'build', 'icon.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: true,
         },
     });
+
     win.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+
+    // F12 / Ctrl+Shift+I 开关 DevTools
+    win.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        const key = (input.key || '').toLowerCase();
+        if (key === 'f12' || (input.control && input.shift && key === 'i')) {
+            if (win.webContents.isDevToolsOpened()) {
+                win.webContents.closeDevTools();
+            } else {
+                win.webContents.openDevTools();
+            }
+            event.preventDefault();
+        }
+    });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    buildMenu();
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
