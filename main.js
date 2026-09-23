@@ -116,6 +116,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+    app.setAppUserModelId('com.block0n.sharebox');
     buildMenu();
     createWindow();
 });

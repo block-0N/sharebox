@@ -787,6 +787,98 @@ function renderHexDump(bytes) {
 /* ============================================================
  * 通用工具
  * ============================================================ */
+/* ============================================================
+ * 系统通知
+ * ============================================================ */
+
+/** 通知是否开启（持久化到 localStorage） */
+let notifyEnabled = localStorage.getItem('notifyEnabled') === '1';
+
+/**
+ * 更新通知按钮样式
+ */
+function updateNotifyBtn() {
+    const btn = document.getElementById('notifyToggle');
+    if (!btn) return;
+    if (notifyEnabled) {
+        btn.classList.add('on');
+        btn.textContent = '🔔 通知';
+        btn.title = '点击关闭桌面通知';
+    } else {
+        btn.classList.remove('on');
+        btn.textContent = '🔕 通知';
+        btn.title = '点击开启桌面通知';
+    }
+}
+
+/**
+ * 初始化通知按钮
+ */
+function initNotifyToggle() {
+    const btn = document.getElementById('notifyToggle');
+    if (!btn) return;
+
+    updateNotifyBtn();
+
+    btn.addEventListener('click', async () => {
+        if (notifyEnabled) {
+            // 关闭
+            notifyEnabled = false;
+            localStorage.setItem('notifyEnabled', '0');
+            updateNotifyBtn();
+            return;
+        }
+
+        // 开启：检查浏览器支持
+        if (!('Notification' in window)) {
+            await dlgAlert('不支持', '当前环境不支持系统通知');
+            return;
+        }
+
+        // 请求权限
+        let perm = Notification.permission;
+        if (perm === 'default') {
+            perm = await Notification.requestPermission();
+        }
+        if (perm !== 'granted') {
+            await dlgAlert('通知被拒绝', '请在浏览器/系统设置里允许本页面发送通知');
+            return;
+        }
+
+        notifyEnabled = true;
+        localStorage.setItem('notifyEnabled', '1');
+        updateNotifyBtn();
+    });
+}
+
+/**
+ * 弹一条桌面通知
+ * @param {string} title
+ * @param {string} body
+ */
+function showNotification(title, body) {
+    if (!notifyEnabled) return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    try {
+        const n = new Notification(title, {
+            body,
+            icon: './build/icon.png',
+            tag: 'sharebox-chat',
+            renotify: true
+        });
+        n.onclick = () => {
+            window.focus();
+            // 切到聊天室 tab
+            const chatTab = document.querySelector('.tab[data-tab="chat"]');
+            if (chatTab) chatTab.click();
+            n.close();
+        };
+    } catch (e) {
+        console.warn('通知发送失败', e);
+    }
+}
 /**
  * 深色模式切换（不持久化）
  */
@@ -1087,7 +1179,17 @@ async function sendMsg() {
 
 // Realtime 监听
 sb.channel("public_chat")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => loadMessages())
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, payload => {
+        loadMessages();
+
+        // 页面在后台时才弹通知（前台自己能看到，不打扰）
+        if (document.visibilityState === 'hidden') {
+            const row = payload.new || {};
+            const name = row.username || '匿名';
+            const content = row.content || '';
+            showNotification(`💬 ${name}`, content);
+        }
+    })
     .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, () => loadMessages())
     .subscribe();
 /* ============================================================
@@ -3076,5 +3178,6 @@ initKeyboardShortcuts();
 initSearch();
 initRubberBand();
 initThemeToggle();
+initNotifyToggle();
 loadMessages();
 loadFiles();

@@ -1656,3 +1656,28 @@ body.dark .search-clear:hover {
     appearance: none;
     display: none;
 }
+
+/* ---------- 顶部按钮组 ---------- */
+.top-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 通知开启状态显示为实心高亮 */
+#notifyToggle.on {
+    background: #2980b9;
+    color: #fff;
+}
+
+#notifyToggle.on:hover {
+    background: #2471a3;
+}
+
+body.dark #notifyToggle.on {
+    background: #5dade2;
+    color: #0f172a;
+}
+
+body.dark #notifyToggle.on:hover {
+    background: #3498db;
+}
