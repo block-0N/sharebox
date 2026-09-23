@@ -1601,3 +1601,52 @@ body.dark .loading-placeholder {
 body.dark .loading-error {
     color: #f87171;
 }
+
+/* ---------- 搜索框清空按钮 ---------- */
+.search-bar {
+    position: relative;
+}
+
+.search-bar input {
+    padding-right: 36px;
+    /* 给按钮留位置 */
+}
+
+.search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    background: #cbd5e1;
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    display: none;
+    /* 默认隐藏，有内容才显示 */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+}
+
+.search-clear:hover {
+    background: #94a3b8;
+}
+
+.search-clear.show {
+    display: flex;
+}
+
+body.dark .search-clear {
+    background: #475569;
+    color: #cbd5e1;
+}
+
+body.dark .search-clear:hover {
+    background: #64748b;
+}

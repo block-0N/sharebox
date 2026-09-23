@@ -2921,6 +2921,17 @@ function initKeyboardShortcuts() {
                 e.preventDefault();
                 pasteHere();
             }
+        } else if (e.key === 'Enter') {
+            if (sel) {
+                e.preventDefault();
+                if (sel.type === 'folder') {
+                    currentPath.push(sel.name);
+                    renderExplorer();
+                } else {
+                    const file = findFileByStoragePath(sel.path);
+                    if (file) openPreview(file);
+                }
+            }
         } else if (e.key === 'Delete') {
             if (sel) { e.preventDefault(); deleteSelected(); }
         } else if (e.key === 'F2') {
@@ -3016,10 +3027,17 @@ function renderSearchResults(wrap, query) {
  */
 function initSearch() {
     const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('searchClear');
     if (!input) return;
+
+    const updateClearBtn = () => {
+        if (!clearBtn) return;
+        clearBtn.classList.toggle('show', input.value.length > 0);
+    };
 
     input.addEventListener('input', () => {
         searchQuery = input.value.trim();
+        updateClearBtn();
         renderFileList();
     });
 
@@ -3027,10 +3045,23 @@ function initSearch() {
         if (e.key === 'Escape') {
             input.value = '';
             searchQuery = '';
+            updateClearBtn();
             renderFileList();
             input.blur();
         }
     });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            searchQuery = '';
+            updateClearBtn();
+            renderFileList();
+            input.focus();
+        });
+    }
+
+    updateClearBtn();
 }
 
 /* ============================================================
