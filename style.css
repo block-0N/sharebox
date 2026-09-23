@@ -1650,3 +1650,9 @@ body.dark .search-clear {
 body.dark .search-clear:hover {
     background: #64748b;
 }
+
+.search-bar input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+}
