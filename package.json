@@ -32,9 +32,20 @@
             "icon": "build/icon.png"
         },
         "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowElevation": true,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "ShareBox",
+            "menuCategory": false,
             "installerIcon": "build/icon.ico",
             "uninstallerIcon": "build/icon.ico",
-            "installerHeaderIcon": "build/icon.ico"
+            "installerHeaderIcon": "build/icon.ico",
+            "installerSidebar": "build/installerSidebar.bmp",
+            "deleteAppDataOnUninstall": false,
+            "language": "2052"
         }
     }
 }
