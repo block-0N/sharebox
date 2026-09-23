@@ -219,7 +219,76 @@ function isTextFile(filename) {
     if (idx === -1 || idx === 0) return true;
     return TEXT_EXTS.has(name.slice(idx + 1));
 }
+/**
+ * Markdown 渲染预览
+ * @param {{displayName?: string, file_name?: string, file_url: string}} file
+ */
+async function openMarkdownPreview(file) {
+    viewerCurrentFile = file;
+    const overlay = document.getElementById('textViewer');
+    const title = document.getElementById('viewerTitle');
+    const content = document.getElementById('viewerContent');
 
+    title.textContent = file.displayName || file.file_name || 'Markdown 预览';
+    content.className = 'viewer-content';
+    content.style.fontSize = '';
+    content.textContent = '加载中…';
+    overlay.classList.add('show');
+
+    try {
+        const res = await fetch(file.file_url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+
+        // 与文本查看器一致：严格 UTF-8 → GBK 兜底
+        let text;
+        try {
+            text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+        } catch (e) {
+            try { text = new TextDecoder('gbk', { fatal: false }).decode(buf); }
+            catch (e2) { text = new TextDecoder('utf-8', { fatal: false }).decode(buf); }
+        }
+
+        if (!window.marked) {
+            // marked 加载失败就退回源码显示
+            content.textContent = text;
+            return;
+        }
+
+        // 用 marked 渲染
+        const html = window.marked.parse(text, {
+            gfm: true,
+            breaks: true
+        });
+
+        content.innerHTML = `<div class="md-body">${html}</div>`;
+
+        // 对渲染出来的代码块再跑一次高亮
+        if (window.hljs) {
+            content.querySelectorAll('pre code').forEach(block => {
+                try { window.hljs.highlightElement(block); } catch (e) { /* ignore */ }
+            });
+        }
+    } catch (err) {
+        console.error('Markdown 渲染失败', err);
+        content.textContent = 'Markdown 加载失败：' + err.message;
+    }
+}
+/**
+ * 给 Promise 加超时，超时后 reject
+ * @param {Promise} promise
+ * @param {number} [ms=15000]
+ * @param {string} [label]
+ * @returns {Promise}
+ */
+function withTimeout(promise, ms = 15000, label = '请求') {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`${label}超时（${ms / 1000}秒）`)), ms)
+        )
+    ]);
+}
 /** 当前查看器打开的文件对象 */
 let viewerCurrentFile = null;
 
@@ -572,6 +641,8 @@ function openOfficePreview(file) {
 /** 统一入口 */
 function openPreview(file) {
     const name = file.displayName || file.file_name || '';
+    const ext = getExt(name);
+    if (ext === 'md' || ext === 'markdown') return openMarkdownPreview(file);
     if (isZipFile(name)) return openZipViewer(file);
     if (isTextFile(name)) return openTextViewer(file);
     if (isImageFile(name)) return openImagePreview(file);
@@ -592,11 +663,11 @@ async function chooseOpenMethod(file) {
     // 按文件类型给出可选方式
     const opts = [];
 
-    // 大部分文本/图片/音频/视频/pdf/office/zip 都可以尝试文本查看
+    if (getExt(name) === 'md' || getExt(name) === 'markdown') {
+        opts.push({ label: 'Markdown 预览', value: 'md', primary: true });
+    }
     opts.push({ label: '文本查看', value: 'text' });
-
-    // 16 进制对所有文件都适用
-    opts.push({ label: '16进制查看', value: 'hex', primary: true });
+    opts.push({ label: '16进制查看', value: 'hex', primary: !(getExt(name) === 'md' || getExt(name) === 'markdown') });
 
     if (isImageFile(name)) opts.push({ label: '图片预览', value: 'image' });
     if (isPdfFile(name)) opts.push({ label: 'PDF 预览', value: 'pdf' });
@@ -608,6 +679,7 @@ async function chooseOpenMethod(file) {
     opts.push({ label: '下载', value: 'download' });
 
     const choice = await dlgChoose('选择打开方式', label, opts);
+    if (choice === 'md') return openMarkdownPreview(file);
     if (choice === 'text') return openTextViewer(file);
     if (choice === 'hex') return openHexViewer(file);
     if (choice === 'image') return openImagePreview(file);
@@ -746,7 +818,33 @@ function escapeHtml(str) {
         "'": '&#39;'
     }[c]));
 }
+/**
+ * 在容器里显示加载中占位
+ * @param {HTMLElement} container
+ * @param {string} [msg]
+ */
+function showLoading(container, msg) {
+    if (!container) return;
+    container.innerHTML = `
+        <div class="loading-placeholder">
+            <div class="spinner"></div>
+            <div>${escapeHtml(msg || '正在加载…')}</div>
+        </div>`;
+}
 
+/**
+ * 在容器里显示加载失败提示
+ * @param {HTMLElement} container
+ * @param {string} [msg]
+ */
+function showLoadError(container, msg) {
+    if (!container) return;
+    container.innerHTML = `
+        <div class="loading-placeholder">
+            <div class="loading-icon">⚠</div>
+            <div class="loading-error">${escapeHtml(msg || '加载失败')}</div>
+        </div>`;
+}
 /**
  * 毫秒格式化为「预计剩余 X分Y秒」
  * @param {number} ms
@@ -924,14 +1022,28 @@ function initTabs() {
  * ============================================================ */
 
 async function loadMessages() {
-    console.log("开始加载聊天消息");
-    const { data, error } = await sb.from("messages").select("*").order("created_at", { asc: true });
-    if (error) {
-        console.error("消息加载错误", error);
-        await dlgAlert("消息加载错误：" + error.message);
+    const box = document.getElementById("msgBox");
+    showLoading(box, '正在加载聊天记录…');
+
+    let data, error;
+    try {
+        const res = await withTimeout(
+            sb.from("messages").select("*").order("created_at", { asc: true }),
+            10000,
+            '加载聊天记录'
+        );
+        data = res.data;
+        error = res.error;
+    } catch (e) {
+        showLoadError(box, e.message);
         return;
     }
-    console.log("消息加载成功，共", data?.length || 0, "条");
+
+    if (error) {
+        console.error("消息加载错误", error);
+        showLoadError(box, '聊天记录加载失败：' + error.message);
+        return;
+    }
     renderMsg(data || []);
 }
 
@@ -941,6 +1053,14 @@ async function loadMessages() {
  */
 function renderMsg(list) {
     const box = document.getElementById("msgBox");
+    if (!list.length) {
+        box.innerHTML = `
+            <div class="loading-placeholder">
+                <div class="loading-icon">💬</div>
+                <div>暂无消息，来说点什么吧</div>
+            </div>`;
+        return;
+    }
     box.innerHTML = list.map(i => `
         <div class="msg-item">
             [${new Date(i.created_at).toLocaleString()}]
@@ -1115,12 +1235,27 @@ function buildTree(data) {
  * 加载文件列表并重建树
  */
 async function loadFiles() {
-    const [listRes, metaMap] = await Promise.all([
-        sb.from("file_list").select("*").order("created_at", { desc: true }),
-        fetchStorageMeta()
-    ]);
+    const wrap = document.getElementById("fileList");
+    showLoading(wrap, '正在加载文件列表…');
+
+    let listRes, metaMap;
+    try {
+        [listRes, metaMap] = await withTimeout(
+            Promise.all([
+                sb.from("file_list").select("*").order("created_at", { desc: true }),
+                fetchStorageMeta()
+            ]),
+            15000,
+            '加载文件列表'
+        );
+    } catch (e) {
+        showLoadError(wrap, e.message);
+        return;
+    }
+
     if (listRes.error) {
         console.error("文件列表加载失败", listRes.error);
+        showLoadError(wrap, '文件列表加载失败：' + listRes.error.message);
         return;
     }
     storageMeta = metaMap;
