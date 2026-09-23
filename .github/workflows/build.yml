@@ -1,28 +1,62 @@
 name: Build Electron Installer
 
 on:
-  workflow_dispatch:        # 关键：允许通过 gh workflow run 手动触发
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
-    runs-on: windows-latest  # 如需同时打包 macOS/Linux，改用 matrix 策略
-    steps:
-      - uses: actions/checkout@v4
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: win
+            pattern: |
+              dist/*.exe
+              dist/*.blockmap
+          - os: macos-latest
+            artifact: mac
+            pattern: |
+              dist/*.dmg
+              dist/*.zip
+          - os: ubuntu-latest
+            artifact: linux
+            pattern: |
+              dist/*.AppImage
 
-      - uses: actions/setup-node@v4
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+
+      - name: Set mirrors (China-friendly)
+        shell: bash
+        run: |
+          echo "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/" >> $GITHUB_ENV
+          echo "ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/" >> $GITHUB_ENV
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
 
       - name: Build installer
         run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload installer artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: electron-installer
-          path: dist/*.exe
+          name: sharebox-${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: warn
+          retention-days: 30
