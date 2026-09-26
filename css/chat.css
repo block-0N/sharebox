@@ -1,0 +1,83 @@
+/* ---------- 聊天室 ---------- */
+#msgBox {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #fbfdff;
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.chat-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.chat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.chat-input-row input {
+    flex: 1;
+    margin: 0;
+}
+
+.chat-input-row input#userName {
+    flex: 0 0 120px;
+}
+
+.chat-input-row button {
+    margin: 0;
+}
+
+/* ---------- 消息条目 ---------- */
+.msg-item {
+    margin: 6px 0;
+    color: #34495e;
+    word-break: break-word;
+    position: relative;
+    padding-right: 26px;
+    min-height: 24px;
+}
+
+.msg-del {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 16px;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    font-weight: 600;
+}
+
+.msg-item:hover .msg-del {
+    display: flex;
+}
+
+.msg-del:hover {
+    background: #ef4444;
+    color: #fff;
+}

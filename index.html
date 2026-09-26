@@ -7,7 +7,13 @@
     <meta name="theme-color" content="#2980b9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/chat.css">
+    <link rel="stylesheet" href="./css/explorer.css">
+    <link rel="stylesheet" href="./css/viewer.css">
+    <link rel="stylesheet" href="./css/dialog.css">
+    <link rel="stylesheet" href="./css/menu.css">
+    <link rel="stylesheet" href="./css/dark.css">
     <link rel="icon" type="image/png" href="./build/icon.png">
     <link rel="alternate icon" type="image/x-icon" href="./build/icon.ico">
     <link rel="apple-touch-icon" href="./build/icon.png">
@@ -33,6 +39,10 @@
         <!-- 聊天室面板 -->
         <div id="tab-chat" class="tab-panel active">
             <div class="card">
+                <div class="chat-header">
+                    <h3>公共聊天室</h3>
+                    <button class="nav-btn" id="btnChatRefresh" type="button" title="刷新">⟳</button>
+                </div>
                 <div id="msgBox"></div>
                 <div class="chat-input-row">
                     <input id="userName" placeholder="昵称" value="匿名用户">
@@ -45,32 +55,23 @@
         <!-- 网盘面板 -->
         <div id="tab-netdisk" class="tab-panel">
             <div class="card">
-                <!-- 拖拽上传区 -->
-                <div id="dropArea">
-                    将文件/文件夹拖拽到此处上传
-                </div>
-
-                <!-- 进度条 -->
-                <div id="progress">
-                    <progress id="uploadProgress" value="0" max="100"></progress>
-                    <span id="uploadTip"></span>
-                </div>
-
-                <!-- 上传按钮 -->
-                <div class="file">
-                    <button onclick="uploadViaFSA()" type="button">📄 选择多个文件</button>
-                    <span id="fileTip">未选择文件</span>
-                </div>
-                <div class="file">
-                    <button onclick="uploadFolderViaFSA()" type="button">📂 选择文件夹</button>
-                    <span id="folderTip">未选择文件夹</span>
-                </div>
+                <!-- 文件夹标签页栏 -->
+                <div class="folder-tabs" id="folderTabs"></div>
 
                 <!-- 资源管理器工具栏 -->
                 <div class="explorer-toolbar">
                     <button class="nav-btn" id="btnUp" type="button" title="上一级">↑ 上一级</button>
                     <div id="breadcrumb"></div>
-                    <button class="nav-btn" id="btnRefresh" type="button" title="刷新">⟳</button>
+                    <div class="toolbar-actions">
+                        <div class="upload-menu-wrap">
+                            <button class="nav-btn" id="btnUpload" type="button" title="上传">📤 上传</button>
+                            <div class="upload-menu" id="uploadMenu">
+                                <div class="upload-menu-item" data-upload="file">📄 选择文件</div>
+                                <div class="upload-menu-item" data-upload="folder">📂 选择文件夹</div>
+                            </div>
+                        </div>
+                        <button class="nav-btn" id="btnRefresh" type="button" title="刷新">⟳</button>
+                    </div>
                 </div>
 
                 <!-- 搜索框 -->
@@ -79,8 +80,14 @@
                     <button type="button" id="searchClear" class="search-clear" title="清空">×</button>
                 </div>
 
-                <!-- 文件列表 -->
-                <div id="fileList"></div>
+                <!-- 文件列表 + 底部进度条 -->
+                <div class="file-list-wrap" id="fileListWrap">
+                    <div id="fileList"></div>
+                    <div id="progress" class="progress-bottom">
+                        <progress id="uploadProgress" value="0" max="100"></progress>
+                        <span id="uploadTip"></span>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -134,7 +141,7 @@
             <div class="viewer-content" id="viewerContent"></div>
         </div>
     </div>
-    <!-- 代码高亮（浅色 / 深色两套，靠 media 切换） -->
+    <!-- 代码高亮 -->
     <link id="hljsLight" rel="stylesheet" media="all"
         href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
     <link id="hljsDark" rel="stylesheet" media="not all"
@@ -143,7 +150,18 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./auth.js"></script>
+
+    <!-- 应用代码（顺序不能变） -->
+    <script src="./js/config.js"></script>
+    <script src="./js/utils.js"></script>
+    <script src="./js/dialog.js"></script>
+    <script src="./js/preview.js"></script>
+    <script src="./js/chat.js"></script>
+    <script src="./js/upload.js"></script>
+    <script src="./js/explorer.js"></script>
+    <script src="./js/actions.js"></script>
+    <script src="./js/tabs.js"></script>
+    <script src="./js/main.js"></script>
 </body>
 
 </html>
