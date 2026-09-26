@@ -108,6 +108,14 @@ async function createWindow() {
         if (!isQuitting) {
             e.preventDefault();
             mainWindow.hide();
+            // 首次关闭提示
+            if (tray && !mainWindow._trayTipShown) {
+                mainWindow._trayTipShown = true;
+                tray.displayBalloon({
+                    title: 'ShareBox 仍在运行',
+                    content: '程序已最小化到系统托盘，右键图标可退出'
+                });
+            }
         }
     });
 
@@ -128,8 +136,6 @@ async function createWindow() {
 function createTray() {
     const iconPath = path.join(__dirname, 'build', 'icon.ico');
     let icon = nativeImage.createFromPath(iconPath);
-    // 托盘图标建议用 16x16，Windows 会自动缩放，这里手动 resize 一下
-    icon = icon.resize({ width: 16, height: 16 });
 
     tray = new Tray(icon);
     tray.setToolTip('ShareBox');
