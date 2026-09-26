@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, session } = require('electron');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -93,7 +93,7 @@ async function createWindow() {
         height: 750,
         minWidth: 800,
         minHeight: 600,
-        icon: path.join(__dirname, 'build', 'icon.ico'),
+        icon: path.join(__dirname, 'assets', 'icon.ico'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -134,7 +134,7 @@ async function createWindow() {
     });
 }
 function createTray() {
-    const iconPath = path.join(__dirname, 'build', 'icon.ico');
+    const iconPath = path.join(__dirname, 'assets', 'icon.ico');
     let icon = nativeImage.createFromPath(iconPath);
 
     tray = new Tray(icon);
@@ -172,6 +172,16 @@ function createTray() {
 }
 app.whenReady().then(() => {
     app.setAppUserModelId('com.block0n.sharebox');
+
+    // 自动授予通知权限
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        if (permission === 'notifications') {
+            callback(true);
+        } else {
+            callback(false);
+        }
+    });
+
     buildMenu();
     createWindow();
     createTray();
