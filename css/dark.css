@@ -575,12 +575,40 @@ body.dark .tab-page.tab-drop-target {
     border-bottom-color: #5dade2;
 }
 
-/* ---------- 底部进度条 ---------- */
-body.dark .progress-bottom {
+/* ---------- 底部状态栏 ---------- */
+body.dark .status-bar {
     background: rgba(30, 41, 59, 0.96);
     border-top-color: #334155;
+    color: #94a3b8;
 }
 
-body.dark .progress-bottom #uploadTip {
+body.dark .progress-inner #uploadTip {
     color: #94a3b8;
+}
+
+body.dark .storage-info {
+    color: #94a3b8;
+}
+
+/* ---------- 面包屑输入框 ---------- */
+body.dark .breadcrumb-input {
+    background: #172033;
+    color: #e2e8f0;
+    border-color: #5dade2;
+}
+
+/* ---------- 面包屑自动补全下拉 ---------- */
+body.dark .breadcrumb-dropdown {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark .breadcrumb-dropdown-item {
+    color: #cbd5e1;
+}
+
+body.dark .breadcrumb-dropdown-item:hover,
+body.dark .breadcrumb-dropdown-item.active {
+    background: #263449;
+    color: #5dade2;
 }

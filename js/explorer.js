@@ -195,6 +195,9 @@ async function loadFiles() {
         if (!getNodeByPath(t.currentPath)) t.currentPath = [];
     }
 
+    // 更新容量显示
+    updateStorageInfo();
+
     // 只渲染当前激活的标签
     renderExplorer();
 }
@@ -258,7 +261,198 @@ function renderBreadcrumb() {
     if (upBtn) upBtn.disabled = currentPath.length === 0;
     bar.scrollLeft = bar.scrollWidth;
 }
+/**
+ * Supabase Storage 免费套餐容量（1 GB）
+ */
+const STORAGE_QUOTA = 1024 * 1024 * 1024;
 
+/**
+ * 更新底部容量显示
+ */
+function updateStorageInfo() {
+    const el = document.getElementById('storageInfo');
+    if (!el) return;
+
+    let used = 0;
+    for (const meta of Object.values(storageMeta)) {
+        used += meta.size || 0;
+    }
+
+    const pct = STORAGE_QUOTA > 0
+        ? ((used / STORAGE_QUOTA) * 100).toFixed(1)
+        : '0';
+
+    el.textContent = `${formatBytes(used)} / ${formatBytes(STORAGE_QUOTA)}`;
+    el.title = `已用 ${formatBytes(used)} / 共 ${formatBytes(STORAGE_QUOTA)}（${pct}%）`;
+}
+
+/**
+ * 递归收集所有目录路径（用于面包屑自动补全）
+ */
+function collectAllFolderPaths(node, basePath, out) {
+    for (const name of Object.keys(node._children)) {
+        const path = [...basePath, name];
+        out.push(path);
+        collectAllFolderPaths(node._children[name], path, out);
+    }
+}
+
+/**
+ * 面包屑编辑状态锁
+ */
+let breadcrumbEditLock = false;
+
+/**
+ * 点击面包屑空白 → 进入路径编辑模式（带自动补全下拉）
+ */
+function enterBreadcrumbEdit() {
+    if (breadcrumbEditLock) return;
+    breadcrumbEditLock = true;
+
+    const bar = document.getElementById('breadcrumb');
+    if (!bar) { breadcrumbEditLock = false; return; }
+
+    const currentPath = getCurrentPath();
+    const fullPath = currentPath.length === 0 ? '' : '/' + currentPath.join('/');
+
+    // 收集所有目录路径
+    const allPaths = [];
+    collectAllFolderPaths(fileTree, [], allPaths);
+    const pathStrings = allPaths.map(p => '/' + p.join('/'));
+
+    // 用 wrap 包住 input 和下拉框，方便定位
+    bar.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+    wrap.style.width = '100%';
+    bar.appendChild(wrap);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'breadcrumb-input';
+    input.value = fullPath;
+    input.placeholder = '/docs/sub';
+    wrap.appendChild(input);
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'breadcrumb-dropdown';
+    wrap.appendChild(dropdown);
+
+    let items = [];
+    let activeIdx = -1;
+
+    const hideDropdown = () => {
+        dropdown.classList.remove('show');
+        dropdown.innerHTML = '';
+        items = [];
+        activeIdx = -1;
+    };
+
+    const renderDropdown = (matches) => {
+        if (matches.length === 0) { hideDropdown(); return; }
+        items = matches;
+        activeIdx = -1;
+        dropdown.innerHTML = matches.map((p, i) =>
+            `<div class="breadcrumb-dropdown-item" data-idx="${i}">${escapeHtml(p)}</div>`
+        ).join('');
+        dropdown.classList.add('show');
+    };
+
+    const updateActiveHighlight = () => {
+        dropdown.querySelectorAll('.breadcrumb-dropdown-item').forEach((el, i) => {
+            el.classList.toggle('active', i === activeIdx);
+        });
+    };
+
+    const applySelection = (p) => {
+        const parts = p.split('/').filter(Boolean);
+        setCurrentPath(parts);
+
+        if (getSearchQuery()) {
+            setSearchQuery('');
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('searchClear');
+            if (searchInput) searchInput.value = '';
+            if (clearBtn) clearBtn.classList.remove('show');
+        }
+        renderExplorer();
+        updateActiveTabTitle();
+    };
+
+    const updateMatches = () => {
+        const val = input.value.trim();
+        if (!val || val === '/') {
+            renderDropdown(pathStrings.slice(0, 10));
+            return;
+        }
+        const q = val.toLowerCase().replace(/^\//, '');
+        const matched = pathStrings.filter(p => {
+            const low = p.toLowerCase();
+            return low.includes('/' + q) || low.includes(q);
+        }).slice(0, 10);
+        renderDropdown(matched);
+    };
+
+    const finish = (save, pathOverride) => {
+        if (!breadcrumbEditLock) return;
+        breadcrumbEditLock = false;
+
+        if (save) {
+            const val = (pathOverride !== undefined ? pathOverride : input.value).trim();
+            applySelection(val);
+        } else {
+            renderBreadcrumb();
+        }
+    };
+
+    input.focus();
+    input.select();
+    updateMatches();
+
+    input.addEventListener('input', updateMatches);
+    input.addEventListener('focus', updateMatches);
+
+    dropdown.addEventListener('mousedown', e => {
+        e.preventDefault(); // 防止 input 先 blur
+        const item = e.target.closest('.breadcrumb-dropdown-item');
+        if (!item) return;
+        const idx = parseInt(item.dataset.idx, 10);
+        const p = items[idx];
+        if (!p) return;
+        finish(true, p);
+    });
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIdx >= 0 && items[activeIdx]) finish(true, items[activeIdx]);
+            else finish(true, input.value);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finish(false);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (items.length === 0) return;
+            activeIdx = (activeIdx + 1) % items.length;
+            updateActiveHighlight();
+            const el = dropdown.querySelectorAll('.breadcrumb-dropdown-item')[activeIdx];
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (items.length === 0) return;
+            activeIdx = (activeIdx - 1 + items.length) % items.length;
+            updateActiveHighlight();
+            const el = dropdown.querySelectorAll('.breadcrumb-dropdown-item')[activeIdx];
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (breadcrumbEditLock) finish(false);
+        }, 150);
+    });
+}
 function renderFileList() {
     const wrap = document.getElementById("fileList");
     if (!wrap) return;
@@ -487,7 +681,14 @@ function initExplorerEvents() {
     // 面包屑点击
     bar.addEventListener("click", e => {
         const crumb = e.target.closest(".crumb");
-        if (!crumb) return;
+
+        // 点空白 → 进入编辑
+        if (!crumb) {
+            setTimeout(() => enterBreadcrumbEdit(), 0);
+            return;
+        }
+
+        // 点路径段 → 跳转
         const idx = parseInt(crumb.dataset.idx, 10);
         const currentPath = getCurrentPath();
         setCurrentPath(currentPath.slice(0, idx + 1));
