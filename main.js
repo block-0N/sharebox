@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, session } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, session, Notification } = require('electron');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -108,13 +108,15 @@ async function createWindow() {
         if (!isQuitting) {
             e.preventDefault();
             mainWindow.hide();
-            // 首次关闭提示
-            if (tray && !mainWindow._trayTipShown) {
+            // 首次关闭提示（用系统通知，比 displayBalloon 可靠）
+            if (!mainWindow._trayTipShown) {
                 mainWindow._trayTipShown = true;
-                tray.displayBalloon({
-                    title: 'ShareBox 仍在运行',
-                    content: '程序已最小化到系统托盘，右键图标可退出'
-                });
+                if (Notification.isSupported()) {
+                    new Notification({
+                        title: 'ShareBox 仍在运行',
+                        body: '程序已最小化到系统托盘，右键图标可退出'
+                    }).show();
+                }
             }
         }
     });
