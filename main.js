@@ -1,4 +1,7 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage } = require('electron');
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -85,7 +88,7 @@ function buildMenu() {
 async function createWindow() {
     await startServer();
 
-    const win = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1100,
         height: 750,
         minWidth: 800,
@@ -98,33 +101,88 @@ async function createWindow() {
         },
     });
 
-    win.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+    mainWindow.loadURL(`http://127.0.0.1:${PORT}/index.html`);
 
-    // F12 / Ctrl+Shift+I 开关 DevTools
-    win.webContents.on('before-input-event', (event, input) => {
+    // 关闭时最小化到托盘，不退出
+    mainWindow.on('close', (e) => {
+        if (!isQuitting) {
+            e.preventDefault();
+            mainWindow.hide();
+        }
+    });
+
+    // F12 / Ctrl+Shift+I 开关 DevTools（保留你原来的）
+    mainWindow.webContents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown') return;
         const key = (input.key || '').toLowerCase();
         if (key === 'f12' || (input.control && input.shift && key === 'i')) {
-            if (win.webContents.isDevToolsOpened()) {
-                win.webContents.closeDevTools();
+            if (mainWindow.webContents.isDevToolsOpened()) {
+                mainWindow.webContents.closeDevTools();
             } else {
-                win.webContents.openDevTools();
+                mainWindow.webContents.openDevTools();
             }
             event.preventDefault();
         }
     });
 }
+function createTray() {
+    const iconPath = path.join(__dirname, 'build', 'icon.ico');
+    let icon = nativeImage.createFromPath(iconPath);
+    // 托盘图标建议用 16x16，Windows 会自动缩放，这里手动 resize 一下
+    icon = icon.resize({ width: 16, height: 16 });
 
+    tray = new Tray(icon);
+    tray.setToolTip('ShareBox');
+
+    const menu = Menu.buildFromTemplate([
+        {
+            label: '显示主窗口',
+            click: () => {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+            }
+        },
+        { type: 'separator' },
+        {
+            label: '退出 ShareBox',
+            click: () => {
+                isQuitting = true;
+                app.quit();
+            }
+        }
+    ]);
+
+    tray.setContextMenu(menu);
+
+    // 双击托盘图标恢复窗口
+    tray.on('double-click', () => {
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    });
+}
 app.whenReady().then(() => {
     app.setAppUserModelId('com.block0n.sharebox');
     buildMenu();
     createWindow();
+    createTray();
 });
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
 });
 
+app.on('before-quit', () => {
+    isQuitting = true;
+});
+
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    } else if (mainWindow) {
+        mainWindow.show();
+    }
 });

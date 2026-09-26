@@ -96,6 +96,30 @@
             </div>
         </div>
     </div>
+    <!-- 新建文件弹窗 -->
+    <div id="newFileDialog" class="dialog-overlay">
+        <div class="dialog-box new-file-box">
+            <div class="dialog-title">新建文件</div>
+            <input type="text" id="newFileName" class="dialog-input" placeholder="文件名（含扩展名）">
+            <textarea id="newFileContent" class="dialog-textarea" placeholder="文件内容（可选）"></textarea>
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="newFileCancel" type="button">取消</button>
+                <button class="dialog-btn primary" id="newFileOk" type="button">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 打开方式弹窗 -->
+    <div id="openWithDialog" class="dialog-overlay">
+        <div class="dialog-box open-with-box">
+            <div class="dialog-title" id="openWithTitle">打开方式</div>
+            <div class="dialog-message" id="openWithMessage"></div>
+            <div class="open-with-list" id="openWithList"></div>
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="openWithCancel" type="button">取消</button>
+            </div>
+        </div>
+    </div>
     <!-- 文本查看器 -->
     <div id="textViewer" class="viewer-overlay">
         <div class="viewer-box">

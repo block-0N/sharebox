@@ -659,28 +659,40 @@ function openPreview(file) {
 async function chooseOpenMethod(file) {
     const label = file.displayName || file.file_name || '文件';
     const name = String(label).toLowerCase();
+    const ext = getExt(name);
 
-    // 按文件类型给出可选方式
-    const opts = [];
+    // 所有打开方式，顺序固定
+    const allMethods = [
+        { label: '文本查看', value: 'text', icon: '📝' },
+        { label: 'Markdown 预览', value: 'md', icon: '📖' },
+        { label: '16 进制查看', value: 'hex', icon: '🔢' },
+        { label: '图片预览', value: 'image', icon: '🖼️' },
+        { label: 'PDF 预览', value: 'pdf', icon: '📕' },
+        { label: '视频播放', value: 'video', icon: '🎬' },
+        { label: '音频播放', value: 'audio', icon: '🎵' },
+        { label: 'Office 预览', value: 'office', icon: '📘' },
+        { label: 'ZIP 查看', value: 'zip', icon: '📦' },
+        { label: '下载', value: 'download', icon: '💾' }
+    ];
 
-    if (getExt(name) === 'md' || getExt(name) === 'markdown') {
-        opts.push({ label: 'Markdown 预览', value: 'md', primary: true });
-    }
-    opts.push({ label: '文本查看', value: 'text' });
-    opts.push({ label: '16进制查看', value: 'hex', primary: !(getExt(name) === 'md' || getExt(name) === 'markdown') });
+    // 当前类型匹配哪些方式
+    const matched = [];
+    if (ext === 'md' || ext === 'markdown') matched.push('md');
+    if (isTextFile(name)) matched.push('text');
+    if (isImageFile(name)) matched.push('image');
+    if (isPdfFile(name)) matched.push('pdf');
+    if (isVideoFile(name)) matched.push('video');
+    if (isAudioFile(name)) matched.push('audio');
+    if (isOfficeFile(name)) matched.push('office');
+    if (isZipFile(name)) matched.push('zip');
 
-    if (isImageFile(name)) opts.push({ label: '图片预览', value: 'image' });
-    if (isPdfFile(name)) opts.push({ label: 'PDF 预览', value: 'pdf' });
-    if (isVideoFile(name)) opts.push({ label: '视频播放', value: 'video' });
-    if (isAudioFile(name)) opts.push({ label: '音频播放', value: 'audio' });
-    if (isOfficeFile(name)) opts.push({ label: 'Office 预览', value: 'office' });
-    if (isZipFile(name)) opts.push({ label: 'ZIP 查看', value: 'zip' });
+    const opts = allMethods.map(m => ({ ...m, default: matched.includes(m.value) }));
 
-    opts.push({ label: '下载', value: 'download' });
+    const choice = await dlgOpenWith('打开方式', label, opts);
+    if (!choice) return;
 
-    const choice = await dlgChoose('选择打开方式', label, opts);
-    if (choice === 'md') return openMarkdownPreview(file);
     if (choice === 'text') return openTextViewer(file);
+    if (choice === 'md') return openMarkdownPreview(file);
     if (choice === 'hex') return openHexViewer(file);
     if (choice === 'image') return openImagePreview(file);
     if (choice === 'pdf') return openPdfPreview(file);
@@ -1087,6 +1099,95 @@ function dlgChoose(title, message, options) {
         const onOverlay = (e) => { if (e.target === overlay) finish(null); };
         const onKey = (e) => { if (e.key === 'Escape') finish(null); };
 
+        overlay.addEventListener('click', onOverlay);
+        document.addEventListener('keydown', onKey);
+
+        overlay.classList.add('show');
+    });
+}
+/**
+ * 新建文件弹窗：文件名 + 内容
+ * @param {string} defaultName
+ * @returns {Promise<{name: string, content: string}|null>}
+ */
+function dlgNewFile(defaultName) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('newFileDialog');
+        const nameInput = document.getElementById('newFileName');
+        const contentArea = document.getElementById('newFileContent');
+        const okBtn = document.getElementById('newFileOk');
+        const cancelBtn = document.getElementById('newFileCancel');
+
+        nameInput.value = defaultName || 'untitled.txt';
+        contentArea.value = '';
+
+        const cleanup = () => {
+            overlay.classList.remove('show');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            overlay.removeEventListener('click', onOverlay);
+            document.removeEventListener('keydown', onKey);
+        };
+
+        const finish = (v) => { cleanup(); resolve(v); };
+        const onOk = () => finish({ name: nameInput.value, content: contentArea.value });
+        const onCancel = () => finish(null);
+        const onOverlay = (e) => { if (e.target === overlay) onCancel(); };
+        const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        overlay.addEventListener('click', onOverlay);
+        document.addEventListener('keydown', onKey);
+
+        overlay.classList.add('show');
+        setTimeout(() => { nameInput.focus(); nameInput.select(); }, 50);
+    });
+}
+/**
+ * 打开方式列表弹窗
+ * @param {string} title
+ * @param {string} message
+ * @param {Array<{label:string, value:any, icon?:string, default?:boolean}>} options
+ * @returns {Promise<any>}
+ */
+function dlgOpenWith(title, message, options) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('openWithDialog');
+        const titleEl = document.getElementById('openWithTitle');
+        const msgEl = document.getElementById('openWithMessage');
+        const listEl = document.getElementById('openWithList');
+        const cancelBtn = document.getElementById('openWithCancel');
+
+        titleEl.textContent = title || '打开方式';
+        msgEl.textContent = message || '';
+        listEl.innerHTML = '';
+
+        const cleanup = () => {
+            overlay.classList.remove('show');
+            cancelBtn.removeEventListener('click', onCancel);
+            overlay.removeEventListener('click', onOverlay);
+            document.removeEventListener('keydown', onKey);
+        };
+
+        const finish = (v) => { cleanup(); resolve(v); };
+
+        for (const opt of options) {
+            const el = document.createElement('div');
+            el.className = 'open-with-item';
+            el.innerHTML =
+                `<span class="open-with-icon">${opt.icon || '📄'}</span>` +
+                `<span class="open-with-name">${escapeHtml(opt.label)}</span>` +
+                (opt.default ? '<span class="open-with-default">推荐</span>' : '');
+            el.addEventListener('click', () => finish(opt.value));
+            listEl.appendChild(el);
+        }
+
+        const onCancel = () => finish(null);
+        const onOverlay = (e) => { if (e.target === overlay) onCancel(); };
+        const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
+
+        cancelBtn.addEventListener('click', onCancel);
         overlay.addEventListener('click', onOverlay);
         document.addEventListener('keydown', onKey);
 
@@ -2588,9 +2689,10 @@ async function deleteSelected() {
  * 新建空文件
  */
 async function createNewFile() {
-    const name = await dlgPrompt('新建文件', '请输入文件名（含扩展名）', 'untitled.txt');
-    if (name === null) return;
-    const trimmed = name.trim();
+    const result = await dlgNewFile('untitled.txt');
+    if (!result) return;
+
+    const trimmed = result.name.trim();
     if (!trimmed) return;
     if (/[\/\\]/.test(trimmed)) {
         await dlgAlert('名称不合法', '文件名不能包含 / 或 \\');
@@ -2604,7 +2706,7 @@ async function createNewFile() {
     }
 
     const fullPath = buildFullPath(currentPath, trimmed);
-    const file = new File([""], trimmed, { type: "text/plain" });
+    const file = new File([result.content || ""], trimmed, { type: "text/plain" });
     const ok = await uploadSingleFileWithPath(file, fullPath);
     if (!ok) {
         await dlgAlert('创建失败', '创建文件失败，请重试');

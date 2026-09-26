@@ -1681,3 +1681,98 @@ body.dark #notifyToggle.on {
 body.dark #notifyToggle.on:hover {
     background: #3498db;
 }
+
+/* ---------- 新建文件弹窗 ---------- */
+.new-file-box {
+    max-width: 520px;
+}
+
+.dialog-textarea {
+    width: 100%;
+    min-height: 180px;
+    max-height: 40vh;
+    margin: 0;
+    padding: 8px 12px;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: #2c3e50;
+    outline: none;
+    background: #fff;
+    resize: vertical;
+}
+
+.dialog-textarea:focus {
+    border-color: #2980b9;
+}
+
+body.dark .dialog-textarea {
+    background: #172033;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+/* ---------- 打开方式弹窗 ---------- */
+.open-with-box {
+    max-width: 420px;
+}
+
+.open-with-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    max-height: 55vh;
+    padding: 4px 0;
+}
+
+.open-with-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+    color: #334155;
+    font-size: 14px;
+    user-select: none;
+}
+
+.open-with-item:hover {
+    background: #eef6fc;
+    color: #2980b9;
+}
+
+.open-with-icon {
+    font-size: 18px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.open-with-name {
+    flex: 1;
+}
+
+.open-with-default {
+    color: #94a3b8;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+body.dark .open-with-item {
+    color: #cbd5e1;
+}
+
+body.dark .open-with-item:hover {
+    background: #263449;
+    color: #5dade2;
+}
+
+body.dark .open-with-default {
+    color: #64748b;
+}
