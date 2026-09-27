@@ -58,13 +58,14 @@ let fileTree = { _files: {}, _children: {} };
 async function fetchStorageMeta() {
     const bucket = 'public_netdisk';
     const pageSize = 100;
-    const maxPages = 10;
+    const SAFETY_LIMIT = 100000;   // 安全上限，防止死循环
     const map = {};
+    let offset = 0;
 
-    for (let page = 0; page < maxPages; page++) {
+    while (offset < SAFETY_LIMIT) {
         const { data, error } = await sb.storage.from(bucket).list('', {
             limit: pageSize,
-            offset: page * pageSize,
+            offset,
             sortBy: { column: 'name', order: 'asc' }
         });
         if (error) {
@@ -81,6 +82,7 @@ async function fetchStorageMeta() {
             };
         }
         if (data.length < pageSize) break;
+        offset += pageSize;
     }
     return map;
 }
@@ -158,9 +160,10 @@ let loadFilesToken = 0;
 /**
  * 加载文件列表并重建树；成功后重绘所有标签页
  */
-async function loadFiles() {
+async function loadFiles(preserveScroll = false) {
     const token = ++loadFilesToken;
     const wrap = document.getElementById("fileList");
+    pendingScrollTop = (preserveScroll && wrap) ? wrap.scrollTop : null;
     showLoading(wrap, '正在加载文件列表…');
 
     let listRes, metaMap;
@@ -238,6 +241,7 @@ function collectAllFiles(node, basePath, out) {
 /* ============================================================
  * 资源管理器渲染
  * ============================================================ */
+let pendingScrollTop = null;    // null 表示渲染后回顶部
 
 function renderExplorer() {
     renderBreadcrumb();
@@ -273,17 +277,26 @@ function updateStorageInfo() {
     const el = document.getElementById('storageInfo');
     if (!el) return;
 
+    const fill = document.getElementById('storageBarFill');
+    const text = document.getElementById('storageText');
+
     let used = 0;
     for (const meta of Object.values(storageMeta)) {
         used += meta.size || 0;
     }
 
-    const pct = STORAGE_QUOTA > 0
-        ? ((used / STORAGE_QUOTA) * 100).toFixed(1)
-        : '0';
+    const pct = STORAGE_QUOTA > 0 ? (used / STORAGE_QUOTA) * 100 : 0;
+    const pctText = pct.toFixed(1);
 
-    el.textContent = `${formatBytes(used)} / ${formatBytes(STORAGE_QUOTA)}`;
-    el.title = `已用 ${formatBytes(used)} / 共 ${formatBytes(STORAGE_QUOTA)}（${pct}%）`;
+    if (text) text.textContent = `${formatBytes(used)} / ${formatBytes(STORAGE_QUOTA)}`;
+
+    if (fill) {
+        fill.style.width = Math.min(pct, 100).toFixed(2) + '%';
+        fill.classList.toggle('warn', pct >= 75 && pct < 90);
+        fill.classList.toggle('danger', pct >= 90);
+    }
+
+    el.title = `已用 ${formatBytes(used)} / 共 ${formatBytes(STORAGE_QUOTA)}（${pctText}%）`;
 }
 
 /**
@@ -560,7 +573,12 @@ function renderFileList() {
     }
 
     wrap.innerHTML = html;
-    wrap.scrollTop = 0;
+    if (pendingScrollTop !== null) {
+        wrap.scrollTop = pendingScrollTop;
+        pendingScrollTop = null;
+    } else {
+        wrap.scrollTop = 0;
+    }
 }
 
 function renderSearchResults(wrap, query) {
@@ -636,7 +654,7 @@ function initExplorerEvents() {
 
     // 单击：触发操作按钮
     list.addEventListener("click", e => {
-        if (suppressNextClick) return;
+        if (isClickSuppressed()) return;
 
         const btn = e.target.closest("button[data-action]");
         const item = e.target.closest(".fe-item");
@@ -669,11 +687,32 @@ function initExplorerEvents() {
             }
             return;
         }
+
+        // ★ 单击"已选中项"的文件名 → 延时进入内联重命名
+        const nameEl = e.target.closest('.fe-name');
+        if (nameEl && !inlineRenameActive) {
+            const sels = getSelectedItems();
+            // 三重判定：mousedown 时该项已选中 + 就是这一项 + click 后仍唯一选中
+            if (lastMousedownSoleSelected &&
+                lastMousedownItemEl === item &&
+                sels.length === 1 &&
+                sels[0].el === item) {
+                if (inlineRenameTimer) clearTimeout(inlineRenameTimer);
+                inlineRenameTimer = setTimeout(() => {
+                    inlineRenameTimer = null;
+                    startInlineRename(item);
+                }, 200);
+            }
+        }
     });
 
     // 双击：进入文件夹 / 打开文件
     list.addEventListener("dblclick", e => {
-        if (suppressNextClick) return;
+        if (isClickSuppressed()) return;
+        if (inlineRenameTimer) {                    // ★ 双击要打开，取消待进入的编辑
+            clearTimeout(inlineRenameTimer);
+            inlineRenameTimer = null;
+        }
         const item = e.target.closest(".fe-item");
         if (!item) return;
         if (item.dataset.type === "folder") {
@@ -731,7 +770,7 @@ function initExplorerEvents() {
     });
 
     // 刷新
-    refreshBtn.addEventListener("click", () => loadFiles());
+    refreshBtn.addEventListener("click", () => loadFiles(true));
 }
 
 /* ============================================================
@@ -783,7 +822,19 @@ function initSearch() {
 
 let dragState = null;
 let dragMoveState = null;
-let suppressNextClick = false;
+
+/** 抑制 click/dblclick 到该时刻（performance.now 时间戳） */
+let suppressClickUntil = 0;
+/** 记录最近一次 mousedown 时目标项是否已选中（用于"单击已选中项进入编辑"） */
+let lastMousedownItemEl = null;
+let lastMousedownSoleSelected = false;
+function suppressClick(ms = 180) {
+    suppressClickUntil = performance.now() + ms;
+}
+
+function isClickSuppressed() {
+    return performance.now() < suppressClickUntil;
+}
 
 /**
  * 取当前所有选中的项
@@ -816,6 +867,14 @@ function initRubberBand() {
 
         const item = e.target.closest('.fe-item');
 
+        // ★ 记录点击前的选中状态（click 时再读，此时 mouseup 已经改过选择）
+        lastMousedownItemEl = item;
+        lastMousedownSoleSelected = !!(
+            item
+            && item.classList.contains('selected')
+            && list.querySelectorAll('.fe-item.selected').length === 1
+        );
+
         // 起点在已选中的条目上 → 拖拽移动
         if (item && item.classList.contains('selected')) {
             dragMoveState = {
@@ -825,7 +884,8 @@ function initRubberBand() {
                 ghostEl: null,
                 hoverFolder: null,
                 hoverTab: null,
-                items: getSelectedItems()
+                items: getSelectedItems(),
+                startItem: item
             };
             return;
         }
@@ -845,60 +905,26 @@ function initRubberBand() {
         /* ---------- 拖拽移动 ---------- */
         if (dragMoveState) {
             const state = dragMoveState;
-            const dx = e.clientX - state.startX;
-            const dy = e.clientY - state.startY;
-            if (!state.activated && Math.hypot(dx, dy) < 5) return;
+            dragMoveState = null;
 
-            if (!state.activated) {
-                state.activated = true;
-                const ghost = document.createElement('div');
-                ghost.className = 'drag-ghost';
-                ghost.textContent = `移动 ${state.items.length} 项`;
-                document.body.appendChild(ghost);
-                state.ghostEl = ghost;
-                document.body.style.cursor = 'grabbing';
+            if (state.ghostEl) state.ghostEl.remove();
+            if (state.hoverFolder) state.hoverFolder.classList.remove('drop-target');
+            if (state.hoverTab) state.hoverTab.classList.remove('tab-drop-target');
+            document.body.style.cursor = '';
+
+            if (state.activated) {
+                suppressClick();
+
+                if (state.hoverTab) {
+                    const targetTabId = state.hoverTab.dataset.tabId;
+                    const srcPath = [...getCurrentPath()];
+                    switchTab(targetTabId);
+                    moveItemsTo(state.items, null, targetTabId, srcPath);
+                } else if (state.hoverFolder) {
+                    const targetFolder = state.hoverFolder.dataset.name;
+                    moveItemsTo(state.items, targetFolder);
+                }
             }
-
-            state.ghostEl.style.left = (e.clientX + 12) + 'px';
-            state.ghostEl.style.top = (e.clientY + 12) + 'px';
-
-            // 检测下方：文件夹 或 其他标签页
-            const under = document.elementFromPoint(e.clientX, e.clientY);
-
-            // 优先判断标签页
-            const tabEl = under && under.closest('.tab-page[data-tab-id]');
-            let newTab = null;
-            if (tabEl && tabEl.dataset.tabId !== activeTabId) {
-                newTab = tabEl;
-            }
-
-            // 文件夹
-            const folderEl = under && under.closest('.fe-item.fe-folder');
-            let newHover = null;
-            if (!newTab && folderEl) {
-                const folderName = folderEl.dataset.name;
-                const hasSelf = state.items.some(it => it.type === 'folder' && it.name === folderName);
-                if (!hasSelf) newHover = folderEl;
-            }
-
-            // 清理旧高亮
-            if (state.hoverFolder && state.hoverFolder !== newHover) {
-                state.hoverFolder.classList.remove('drop-target');
-            }
-            if (state.hoverTab && state.hoverTab !== newTab) {
-                state.hoverTab.classList.remove('tab-drop-target');
-            }
-
-            // 新高亮
-            if (newHover && state.hoverFolder !== newHover) {
-                newHover.classList.add('drop-target');
-            }
-            if (newTab && state.hoverTab !== newTab) {
-                newTab.classList.add('tab-drop-target');
-            }
-
-            state.hoverFolder = newHover;
-            state.hoverTab = newTab;
             return;
         }
 
@@ -954,17 +980,29 @@ function initRubberBand() {
             document.body.style.cursor = '';
 
             if (state.activated) {
-                suppressNextClick = true;
-                setTimeout(() => { suppressNextClick = false; }, 0);
+                suppressClick();
 
                 if (state.hoverTab) {
-                    // 拖到其他标签页 → 切换过去 + 移动
                     const targetTabId = state.hoverTab.dataset.tabId;
+                    const srcPath = [...getCurrentPath()];   // ← 切换前抓源路径
                     switchTab(targetTabId);
-                    moveItemsTo(state.items, null, targetTabId);
+                    moveItemsTo(state.items, null, targetTabId, srcPath);
                 } else if (state.hoverFolder) {
                     const targetFolder = state.hoverFolder.dataset.name;
                     moveItemsTo(state.items, targetFolder);
+                }
+            } else if (state.startItem) {
+                // 未拖拽（就是单击）→ 调整选择
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl/Cmd+单击已选中项 → 取消选中它
+                    state.startItem.classList.remove('selected');
+                } else if (!e.shiftKey) {
+                    // 无修饰键 → 若多选，收缩为只选中这一项
+                    const selectedCount = list.querySelectorAll('.fe-item.selected').length;
+                    if (selectedCount > 1) {
+                        list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                        state.startItem.classList.add('selected');
+                    }
                 }
             }
             return;
@@ -975,8 +1013,7 @@ function initRubberBand() {
 
         if (dragState.activated) {
             if (dragState.bandEl) dragState.bandEl.remove();
-            suppressNextClick = true;
-            setTimeout(() => { suppressNextClick = false; }, 0);
+            suppressClick();
         } else if (dragState.startItem) {
             const item = dragState.startItem;
             if (e.ctrlKey || e.metaKey) {
@@ -1032,19 +1069,23 @@ function resolveTargetConflict(allFiles, targetPrefix, name) {
  * @param {string|null} targetFolder  同一标签页内的文件夹名
  * @param {string|null} targetTabId   目标标签页 id（跨标签页移动）
  */
-async function moveItemsTo(items, targetFolder, targetTabId) {
+async function moveItemsTo(items, targetFolder, targetTabId, sourcePathOverride) {
     if (!items || items.length === 0) return;
 
-    const sourcePath = getCurrentPath();
+    // 源路径：跨标签页时必须在 switchTab 之前抓到，由调用方传入
+    const sourcePath = sourcePathOverride || getCurrentPath();
 
     // 确定目标路径
     let targetPath;
     if (targetTabId) {
         const targetTab = tabs.find(t => t.id === targetTabId);
-        targetPath = targetTab ? targetTab.currentPath : [];
+        targetPath = targetTab ? [...targetTab.currentPath] : [];
     } else {
         targetPath = [...sourcePath, targetFolder];
     }
+
+    // 目标 == 源目录，直接忽略
+    if (targetPath.join('/') === sourcePath.join('/')) return;
 
     const targetPrefix = targetPath.join('/');
 
@@ -1083,6 +1124,13 @@ async function moveItemsTo(items, targetFolder, targetTabId) {
 
     const ids = plans.map(p => p.id);
     const rows = allFiles.filter(r => ids.includes(r.id));
+    // 记录原始记录，用于回滚
+    const originals = rows.map(r => ({
+        file_name: r.file_name,
+        file_url: r.file_url,
+        storage_path: r.storage_path
+    }));
+
     const { error: delErr } = await sb.from('file_list').delete().in('id', ids);
     if (delErr) { await dlgAlert('移动失败', delErr.message); return; }
 
@@ -1096,7 +1144,16 @@ async function moveItemsTo(items, targetFolder, targetTabId) {
     });
     const { error: insErr } = await sb.from('file_list').insert(newRows);
     if (insErr) {
-        showToast('移动失败：' + insErr.message, 'error');
+        // 回滚
+        const { error: rbErr } = await sb.from('file_list').insert(originals);
+        if (rbErr) {
+            await dlgAlert(
+                '移动失败（回滚也失败）',
+                `插入新记录失败：${insErr.message}\n回滚失败：${rbErr.message}\n\n请手动检查文件列表，部分记录可能已丢失。`
+            );
+        } else {
+            await dlgAlert('移动失败', `${insErr.message}\n\n已自动回滚，文件未变动。`);
+        }
         loadFiles();
         return;
     }

@@ -3,10 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.bootcdn.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https://cdn.jsdelivr.net https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in; media-src 'self' blob: https://*.supabase.co https://*.supabase.in; frame-src https://*.supabase.co https://*.supabase.in https://view.officeapps.live.com; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2980b9">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="./css/base.css">
     <link rel="stylesheet" href="./css/chat.css">
     <link rel="stylesheet" href="./css/explorer.css">
@@ -14,9 +15,8 @@
     <link rel="stylesheet" href="./css/dialog.css">
     <link rel="stylesheet" href="./css/menu.css">
     <link rel="stylesheet" href="./css/dark.css">
-    <link rel="icon" type="image/png" href="./build/icon.png">
-    <link rel="alternate icon" type="image/x-icon" href="./build/icon.ico">
-    <link rel="apple-touch-icon" href="./build/icon.png">
+    <link rel="icon" type="image/x-icon" href="./assets/icon.ico">
+    <link rel="apple-touch-icon" href="./assets/icon.ico">
     <title>ShareBox</title>
 </head>
 
@@ -88,7 +88,12 @@
                             <progress id="uploadProgress" value="0" max="100"></progress>
                             <span id="uploadTip"></span>
                         </div>
-                        <div class="storage-info" id="storageInfo">— / —</div>
+                        <div class="storage-info" id="storageInfo" title="存储空间">
+                            <div class="storage-bar">
+                                <div class="storage-bar-fill" id="storageBarFill"></div>
+                            </div>
+                            <span class="storage-text" id="storageText">— / —</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -155,6 +160,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- 应用代码（顺序不能变） -->
+    <script src="./env.js"></script>
     <script src="./js/config.js"></script>
     <script src="./js/utils.js"></script>
     <script src="./js/dialog.js"></script>

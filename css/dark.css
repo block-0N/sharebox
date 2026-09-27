@@ -225,6 +225,12 @@ body.dark .fe-name {
     color: #e2e8f0;
 }
 
+body.dark .fe-name-input {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-color: #5dade2;
+}
+
 body.dark .fe-item.fe-folder .fe-name {
     color: #5dade2;
 }
@@ -590,6 +596,10 @@ body.dark .storage-info {
     color: #94a3b8;
 }
 
+body.dark .storage-bar {
+    background: #334155;
+}
+
 /* ---------- 面包屑输入框 ---------- */
 body.dark .breadcrumb-input {
     background: #172033;
@@ -617,6 +627,26 @@ body.dark .breadcrumb-dropdown-item.active {
 body.dark .toast {
     background: #1e293b;
     border-color: #334155;
-    color: #cbd5e1;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    color: #e2e8f0;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .toast-icon {
+    background: #1e3a5f;
+    color: #5dade2;
+}
+
+body.dark .toast.toast-success .toast-icon {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+body.dark .toast.toast-error .toast-icon {
+    background: #7f1d1d;
+    color: #fca5a5;
+}
+
+body.dark .toast.toast-info .toast-icon {
+    background: #1e3a5f;
+    color: #5dade2;
 }

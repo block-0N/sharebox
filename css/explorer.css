@@ -393,10 +393,48 @@
 .storage-info {
     margin-left: auto;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: #64748b;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
     user-select: none;
+}
+
+.storage-bar {
+    width: 80px;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.storage-bar-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #3498db, #2980b9);
+    border-radius: 3px;
+    transition: width 0.35s ease, background 0.35s ease;
+}
+
+.storage-bar-fill.warn {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.storage-bar-fill.danger {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.storage-text {
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .storage-bar {
+        width: 50px;
+    }
 }
 
 #fileList.dragover {
@@ -451,6 +489,23 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* ---------- 内联重命名输入框 ---------- */
+.fe-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 6px;
+    margin: 0;
+    font-size: inherit;
+    font-family: inherit;
+    line-height: inherit;
+    border: 1px solid #2980b9;
+    border-radius: 4px;
+    outline: none;
+    background: #fff;
+    color: #2c3e50;
+    box-sizing: border-box;
 }
 
 .fe-item.fe-folder .fe-name {

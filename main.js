@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, session, Notification } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, session, Notification, dialog } = require('electron');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -35,6 +35,13 @@ function startServer() {
                 res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
                 res.end(data);
             });
+        });
+        server.on('error', (err) => {
+            const msg = err.code === 'EADDRINUSE'
+                ? `端口 ${PORT} 已被占用。\n\n可能已有一个 ShareBox 正在运行。\n请先关闭它，稍候重试。`
+                : `本地服务启动失败：${err.message}`;
+            dialog.showErrorBox('ShareBox 启动失败', msg);
+            app.quit();
         });
         server.listen(PORT, '127.0.0.1', () => resolve(server));
     });

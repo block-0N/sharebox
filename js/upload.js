@@ -212,14 +212,15 @@ async function doUploadItems(rawItems, showSpeed) {
         let estimateText = "预计剩余 计算中…";
         if (showSpeed) {
             const costSec = (performance.now() - startTs) / 1000;
-            let bytesPerSec = avgKbPerSec * 1024;
             if (totalUploadBytes > 0 && costSec > 0) {
-                bytesPerSec = totalUploadBytes / costSec;
+                const bytesPerSec = totalUploadBytes / costSec;
                 avgKbPerSec = avgKbPerSec * 0.7 + (bytesPerSec / 1024) * 0.3;
+                const remainBytes = Math.max(totalBytes - totalUploadBytes, 0);
+                const remainMs = Math.max((remainBytes / (avgKbPerSec * 1024)) * 1000, 1000);
+                estimateText = `${formatMs(remainMs)}，平均 ${avgKbPerSec.toFixed(1)} KB/s`;
+            } else {
+                estimateText = '正在估算速度…';
             }
-            const remainBytes = Math.max(totalBytes - totalUploadBytes, 0);
-            const remainMs = Math.max((remainBytes / bytesPerSec) * 1000, 1000);
-            estimateText = `${formatMs(remainMs)}，速度 ${avgKbPerSec.toFixed(2)} KB/s`;
         } else {
             const costMs = performance.now() - startTs;
             if (currentFinished > 0 && costMs > 0) {

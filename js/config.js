@@ -1,6 +1,18 @@
-// Supabase 信息
-const SUPABASE_URL = "https://ekphociqviwojbonbcbd.supabase.co";
-const ANON_KEY = "sb_publishable_ebvcoe-OiDqlZJTkIsvZ1g_KsDf4sSU";
+// Supabase 信息 —— 从 env.js 读取
+const __ENV = window.__SHAREBOX_ENV__ || {};
+const SUPABASE_URL = __ENV.SUPABASE_URL;
+const ANON_KEY = __ENV.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !ANON_KEY) {
+    document.body.innerHTML = `
+        <div style="padding:40px;font-family:system-ui;line-height:1.8;color:#334155">
+            <h2 style="color:#dc2626">缺少 Supabase 配置</h2>
+            <p>请检查项目根目录的 <code>env.js</code> 是否存在，且填好了
+            <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code>。</p>
+        </div>`;
+    throw new Error('Supabase 配置缺失：请检查 env.js');
+}
+
 const sb = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
 
 /** 文件夹占位文件名 */

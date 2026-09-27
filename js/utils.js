@@ -3,6 +3,16 @@
  * ============================================================ */
 
 /**
+ * 安全 localStorage（Edge 跟踪防护可能拦截）
+ */
+function safeGetLocal(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeSetLocal(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+}
+
+/**
  * HTML 转义
  */
 function escapeHtml(str) {
@@ -143,7 +153,7 @@ function initThemeToggle() {
  * 系统通知
  * ============================================================ */
 
-let notifyEnabled = localStorage.getItem('notifyEnabled') === '1';
+let notifyEnabled = safeGetLocal('notifyEnabled') === '1';
 
 function updateNotifyBtn() {
     const btn = document.getElementById('notifyToggle');
@@ -167,7 +177,7 @@ function initNotifyToggle() {
     btn.addEventListener('click', async () => {
         if (notifyEnabled) {
             notifyEnabled = false;
-            localStorage.setItem('notifyEnabled', '0');
+            safeSetLocal('notifyEnabled', '0');
             updateNotifyBtn();
             return;
         }
@@ -187,7 +197,7 @@ function initNotifyToggle() {
         }
 
         notifyEnabled = true;
-        localStorage.setItem('notifyEnabled', '1');
+        safeSetLocal('notifyEnabled', '1');
         updateNotifyBtn();
     });
 }
@@ -207,7 +217,7 @@ function showNotification(title, body) {
     try {
         const n = new Notification(title, {
             body,
-            icon: './build/icon.png',
+            icon: './assets/icon.ico',
             tag: 'sharebox-chat'
         });
         n.onclick = () => {

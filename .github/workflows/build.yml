@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Set mirrors (China-friendly)
@@ -45,8 +45,13 @@ jobs:
           echo "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/" >> $GITHUB_ENV
           echo "ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/" >> $GITHUB_ENV
 
+      - name: Validate icons
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');const buf=fs.readFileSync('build/icon.png');if(buf.slice(1,4).toString()!=='PNG'){console.error('build/icon.png 不是有效 PNG');process.exit(1);}const w=buf.readUInt32BE(16),h=buf.readUInt32BE(20);if(w<512||h<512){console.error('build/icon.png 尺寸 '+w+'x'+h+'，macOS 要求 >=512x512');process.exit(1);}console.log('OK build/icon.png '+w+'x'+h);"
+
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Set version from tag
         if: startsWith(github.ref, 'refs/tags/v')

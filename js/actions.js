@@ -4,7 +4,10 @@
 
 /** 剪贴板：{ mode: 'copy'|'cut', entries: [{...}] } */
 let clipboard = null;
-
+/** 内联重命名状态锁 */
+let inlineRenameActive = false;
+/** 进入编辑的延迟 timer（用于和 dblclick 竞争） */
+let inlineRenameTimer = null;
 /**
  * 在内存文件树里找同目录下是否已有同名文件，有则加 (1)(2)…
  */
@@ -12,7 +15,8 @@ function resolveNameConflict(parentPath, relName) {
     const parts = relName.split('/');
     const filename = parts.pop();
     const node = getNodeByPath([...parentPath, ...parts]);
-    if (!node || !node._files[filename]) return relName;
+    if (!node) return relName;
+    if (!node._files[filename] && !node._children[filename]) return relName;
 
     const dotIdx = filename.lastIndexOf('.');
     const base = dotIdx > 0 ? filename.slice(0, dotIdx) : filename;
@@ -21,7 +25,7 @@ function resolveNameConflict(parentPath, relName) {
     let i = 1;
     while (true) {
         const candidate = `${base} (${i})${ext}`;
-        if (!node._files[candidate]) {
+        if (!node._files[candidate] && !node._children[candidate]) {
             parts.push(candidate);
             return parts.join('/');
         }
@@ -61,7 +65,8 @@ async function copySelection(cut = false) {
                     originalId: row.id,
                     originalFileName: row.file_name,
                     storagePath: row.storage_path,
-                    newRelName: sel.name + '/' + rel
+                    newRelName: sel.name + '/' + rel,
+                    groupKey: sel.name
                 });
             }
         }
@@ -98,8 +103,23 @@ async function pasteHere() {
     const mode = clipboard.mode;
     const entries = clipboard.entries.slice();
 
+    // 同一个 groupKey（同一文件夹）只算一次冲突名
+    const groupResolved = new Map();
     for (const entry of entries) {
-        const safeRel = resolveNameConflict(currentPath, entry.newRelName);
+        if (entry.groupKey) {
+            if (!groupResolved.has(entry.groupKey)) {
+                groupResolved.set(entry.groupKey, resolveNameConflict(currentPath, entry.groupKey));
+            }
+            const safeFolder = groupResolved.get(entry.groupKey);
+            const rel = entry.newRelName.slice(entry.groupKey.length + 1);
+            entry.safeRel = safeFolder + '/' + rel;
+        } else {
+            entry.safeRel = resolveNameConflict(currentPath, entry.newRelName);
+        }
+    }
+
+    for (const entry of entries) {
+        const safeRel = entry.safeRel;
         const targetFileName = buildFullPath(currentPath, safeRel);
 
         const ext = (entry.storagePath.split('.').pop() || 'bin');
@@ -145,15 +165,12 @@ async function pasteHere() {
 /* ============================================================
  * 重命名
  * ============================================================ */
-
-async function renameSelected() {
-    const sel = getSelectedItem();
-    if (!sel) return;
-
-    const newName = await dlgPrompt('重命名', '请输入新名称', sel.name);
-    if (newName === null) return;
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === sel.name) return;
+/**
+ * 执行重命名（不弹窗，直接改）。原 renameSelected 和 startInlineRename 共用。
+ * @param {{type:string, name:string, path:string}} sel
+ * @param {string} trimmed 新名字（已 trim）
+ */
+async function doRenameTo(sel, trimmed) {
     if (/[\/\\]/.test(trimmed)) {
         await dlgAlert('名称不合法', '名称不能包含 / 或 \\');
         return;
@@ -217,6 +234,16 @@ async function renameSelected() {
     showToast('重命名成功', 'success');
     loadFiles();
 }
+async function renameSelected() {
+    const sel = getSelectedItem();
+    if (!sel) return;
+
+    const newName = await dlgPrompt('重命名', '请输入新名称', sel.name);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === sel.name) return;
+    await doRenameTo(sel, trimmed);
+}
 
 /* ============================================================
  * 删除
@@ -278,10 +305,16 @@ async function delFolder(folderPrefix) {
     const storagePaths = targetFiles.map(i => i.storage_path);
     const ids = targetFiles.map(i => i.id);
     const batchSize = 5;
+    let stFailed = 0;
     for (let i = 0; i < storagePaths.length; i += batchSize) {
         const pathBatch = storagePaths.slice(i, i + batchSize);
         const idBatch = ids.slice(i, i + batchSize);
-        await sb.storage.from('public_netdisk').remove(pathBatch);
+        const { error: stErr } = await sb.storage
+            .from('public_netdisk').remove(pathBatch);
+        if (stErr) {
+            stFailed += pathBatch.length;
+            console.warn('删除 storage 对象失败', stErr.message);
+        }
         await sb.from('file_list').delete().in('id', idBatch);
         currentFinished += pathBatch.length;
     }
@@ -289,7 +322,11 @@ async function delFolder(folderPrefix) {
     isDone = true;
     cancelAnimationFrame(rafId);
     updateProgress(totalCount, currentFinished, 'delete');
-    showToast(`文件夹已删除（${totalCount} 个文件）`, 'success');
+    if (stFailed > 0) {
+        showToast(`文件夹记录已删（${totalCount} 个），但 ${stFailed} 个存储对象删除失败`, 'error', 4000);
+    } else {
+        showToast(`文件夹已删除（${totalCount} 个文件）`, 'success');
+    }
     setTimeout(() => { updateProgress(0, 0, 'delete'); loadFiles(); }, 800);
 }
 
@@ -338,8 +375,19 @@ async function deleteSelected() {
             const paths = targets.map(r => r.storage_path);
             const ids = targets.map(r => r.id);
             for (let i = 0; i < paths.length; i += 5) {
-                await sb.storage.from('public_netdisk').remove(paths.slice(i, i + 5));
-                await sb.from('file_list').delete().in('id', ids.slice(i, i + 5));
+                const { error: stErr } = await sb.storage
+                    .from('public_netdisk')
+                    .remove(paths.slice(i, i + 5));
+                if (stErr) {
+                    console.warn('删除 storage 对象失败', stErr.message);
+                    thisOk = false;
+                }
+                const { error: dbErr } = await sb.from('file_list')
+                    .delete().in('id', ids.slice(i, i + 5));
+                if (dbErr) {
+                    console.error(dbErr);
+                    thisOk = false;
+                }
             }
         }
 
@@ -803,4 +851,101 @@ function initKeyboardShortcuts() {
             hideContextMenu();
         }
     });
+}
+/* ============================================================
+ * 内联重命名：把 fe-name 换成 input，就地编辑
+ * ============================================================ */
+
+function cancelInlineRename() {
+    if (inlineRenameTimer) {
+        clearTimeout(inlineRenameTimer);
+        inlineRenameTimer = null;
+    }
+    const input = document.querySelector('.fe-name-input');
+    if (input) {
+        const nameEl = input._feNameEl;
+        if (nameEl) nameEl.style.display = '';
+        input.remove();
+    }
+    inlineRenameActive = false;
+}
+
+/**
+ * 进入内联重命名
+ * @param {HTMLElement} itemEl  .fe-item 元素
+ */
+function startInlineRename(itemEl) {
+    if (inlineRenameActive) return;
+    if (!itemEl) return;
+
+    const nameEl = itemEl.querySelector('.fe-name');
+    if (!nameEl) return;
+
+    const sel = {
+        type: itemEl.dataset.type,
+        name: itemEl.dataset.name,
+        id: itemEl.dataset.id,
+        path: itemEl.dataset.path,
+        el: itemEl
+    };
+    // 文件必须能在文件树里找到
+    if (sel.type === 'file' && !findFileByStoragePath(sel.path)) return;
+
+    inlineRenameActive = true;
+
+    const originalText = sel.name || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'fe-name-input';
+    input.value = originalText;
+    input._feNameEl = nameEl;
+
+    nameEl.style.display = 'none';
+    nameEl.parentNode.insertBefore(input, nameEl.nextSibling);
+
+    // 只选中主名，不含扩展名
+    const dotIdx = originalText.lastIndexOf('.');
+    if (sel.type === 'file' && dotIdx > 0) {
+        input.setSelectionRange(0, dotIdx);
+    } else {
+        input.select();
+    }
+    input.focus();
+
+    let finished = false;
+
+    const finish = (commit) => {
+        if (finished) return;
+        finished = true;
+        const newName = input.value.trim();
+        // 先撤掉 UI，再提交/回滚
+        if (nameEl) nameEl.style.display = '';
+        input.remove();
+        inlineRenameActive = false;
+        inlineRenameTimer = null;
+
+        if (!commit) return;
+        if (!newName || newName === originalText) return;
+        doRenameTo(sel, newName);
+    };
+
+    input.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            finish(true);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finish(false);
+        }
+    });
+    input.addEventListener('blur', () => {
+        // Enter 触发 finish 后 blur 会再来一次，finished 已拦住
+        setTimeout(() => finish(false), 0);
+    });
+    // 阻止冒泡，避免触发框选/拖拽/右键逻辑
+    input.addEventListener('mousedown', e => e.stopPropagation());
+    input.addEventListener('click', e => e.stopPropagation());
+    input.addEventListener('dblclick', e => e.stopPropagation());
+    input.addEventListener('contextmenu', e => e.stopPropagation());
 }
