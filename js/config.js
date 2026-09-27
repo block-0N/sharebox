@@ -105,6 +105,10 @@ const FILE_ICON_SVG_MAP = {
     fs: 'file_type_fsharp.svg', fsx: 'file_type_fsharp.svg',
     ml: 'file_type_ocaml.svg', mli: 'file_type_ocaml.svg',
     scpt: 'file_type_applescript.svg',
+    'code-profile': 'file_type_vscode.svg', 'code-workspace': 'file_type_vscode.svg',
+    'code-snippets': 'file_type_vscode.svg', vsix: 'file_type_vscode.svg',
+    vsixmanifest: 'file_type_vscode.svg', webmanifest: 'file_type_manifest.svg',
+    mod: 'file_type_mod.svg'
 };
 
 /* ============================================================
@@ -124,11 +128,13 @@ const TEXT_EXTS = new Set([
     'env', 'lua', 'dart', 'swift', 'kt', 'kts', 'scala', 'r', 'm', 'pl',
     'tex', 'rst', 'srt', 'vtt', 'properties', 'gradle', 'lock', 'svg',
     'webmanifest', 'map', 'graphql', 'gql', 'proto', 'asm', 'vb', 'pas', 'f90',
-    'jl', 'nim', 'zig'
+    'jl', 'nim', 'zig', 'code-profile', 'code-workspace', 'code-snippets', 'vsixmanifest'
 ]);
 
 const HLJS_LANG_MAP = {
     md: 'markdown', markdown: 'markdown', txt: 'plaintext', log: 'plaintext',
+    'code-profile': 'json', 'code-workspace': 'json',
+    'code-snippets': 'json', vsixmanifest: 'json', webmanifest: 'json',
     json: 'json', json5: 'json', xml: 'xml', html: 'xml', htm: 'xml', svg: 'xml',
     vue: 'xml', svelte: 'xml', css: 'css', scss: 'scss', less: 'less',
     js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript',
@@ -148,7 +154,6 @@ const HLJS_LANG_MAP = {
     srt: 'plaintext', vtt: 'plaintext'
 };
 
-/** 扩展名 → 中文类型标签 */
 /** 扩展名 → 中文类型标签 */
 const FILE_TYPE_LABELS = {
     // ---------- 文档 / 文本 ----------
@@ -179,6 +184,11 @@ const FILE_TYPE_LABELS = {
     jsonc: 'JSON with Comments',
     jsonl: 'JSON Lines',
     ndjson: 'NDJSON 数据',
+    'code-profile': 'VScode 用户配置',
+    'code-workspace': 'VScode 工作区',
+    'code-snippets': 'VScode 代码片段',
+    vsixmanifest: 'VScode 扩展清单',
+    webmanifest: 'Web App 清单',
     xml: 'XML 文档',
     yaml: 'YAML 配置',
     yml: 'YAML 配置',
