@@ -73,7 +73,7 @@ async function copySelection(cut = false) {
     }
 
     clipboard = { mode: cut ? 'cut' : 'copy', entries };
-    console.log(`已${cut ? '剪切' : '复制'} ${entries.length} 项`);
+    showToast(`已${cut ? '剪切' : '复制'} ${entries.length} 项`, 'info');
 
     // 视觉反馈：复制/剪切的条目半透明
     const list = document.getElementById('fileList');
@@ -135,6 +135,9 @@ async function pasteHere() {
         clipboard = null;
         // 清理半透明样式
         document.querySelectorAll('.fe-item.clipboard').forEach(el => el.classList.remove('clipboard'));
+        showToast(`已剪切粘贴 ${entries.length} 项`, 'success');
+    } else {
+        showToast(`已复制粘贴 ${entries.length} 项`, 'success');
     }
     loadFiles();
 }
@@ -211,7 +214,7 @@ async function renameSelected() {
             return;
         }
     }
-
+    showToast('重命名成功', 'success');
     loadFiles();
 }
 
@@ -223,9 +226,18 @@ async function delFile(rowId, storagePath) {
     const ok = await dlgConfirm('删除文件', '确定删除该文件？', true);
     if (!ok) return;
     const { error: dbErr } = await sb.from('file_list').delete().eq('id', rowId);
-    if (dbErr) { console.error("删除记录失败", dbErr); await dlgAlert("删除失败"); return; }
+    if (dbErr) {
+        console.error("删除记录失败", dbErr);
+        showToast('删除失败：' + dbErr.message, 'error');
+        return;
+    }
     const { error: stErr } = await sb.storage.from('public_netdisk').remove([storagePath]);
-    if (stErr) { console.error("删除存储失败", stErr); }
+    if (stErr) {
+        console.error("删除存储失败", stErr);
+        showToast('文件记录已删，但存储对象删除失败', 'error');
+    } else {
+        showToast('文件已删除', 'success');
+    }
     loadFiles();
 }
 
@@ -277,6 +289,7 @@ async function delFolder(folderPrefix) {
     isDone = true;
     cancelAnimationFrame(rafId);
     updateProgress(totalCount, currentFinished, 'delete');
+    showToast(`文件夹已删除（${totalCount} 个文件）`, 'success');
     setTimeout(() => { updateProgress(0, 0, 'delete'); loadFiles(); }, 800);
 }
 
@@ -297,17 +310,22 @@ async function deleteSelected() {
     if (!ok) return;
 
     const currentPath = getCurrentPath();
+    let okCount = 0;
+    let failCount = 0;
+
     for (const sel of sels) {
+        let thisOk = true;
+
         if (sel.type === 'file') {
             const file = findFileByStoragePath(sel.path);
-            if (!file) continue;
+            if (!file) { failCount++; continue; }
             const { error: dbErr } = await sb.from('file_list').delete().eq('id', file.id);
-            if (dbErr) { console.error(dbErr); continue; }
+            if (dbErr) { console.error(dbErr); failCount++; continue; }
             await sb.storage.from('public_netdisk').remove([file.storage_path]);
         } else {
             const folderPrefix = buildFullPath(currentPath, sel.name);
             const { data: allFiles, error } = await sb.from('file_list').select('*');
-            if (error) { console.error(error); continue; }
+            if (error) { console.error(error); failCount++; continue; }
 
             const prefix1 = folderPrefix + '/';
             const prefix2 = '/' + folderPrefix + '/';
@@ -315,7 +333,7 @@ async function deleteSelected() {
                 const n = r.file_name || '';
                 return n.startsWith(prefix1) || n.startsWith(prefix2);
             });
-            if (targets.length === 0) continue;
+            if (targets.length === 0) { failCount++; continue; }
 
             const paths = targets.map(r => r.storage_path);
             const ids = targets.map(r => r.id);
@@ -324,6 +342,16 @@ async function deleteSelected() {
                 await sb.from('file_list').delete().in('id', ids.slice(i, i + 5));
             }
         }
+
+        if (thisOk) okCount++;
+    }
+
+    if (failCount === 0) {
+        showToast(`已删除 ${okCount} 项`, 'success');
+    } else if (okCount === 0) {
+        showToast(`删除失败（${failCount} 项）`, 'error');
+    } else {
+        showToast(`成功 ${okCount} 项，失败 ${failCount} 项`, 'error');
     }
 
     loadFiles();
@@ -442,9 +470,10 @@ async function createNewFile() {
     const file = new File([result.content || ""], trimmed, { type: "text/plain" });
     const ok = await uploadSingleFileWithPath(file, fullPath);
     if (!ok) {
-        await dlgAlert('创建失败', '创建文件失败，请重试');
+        showToast('创建文件失败', 'error');
         return;
     }
+    showToast(`已创建 ${trimmed}`, 'success');
     loadFiles();
 }
 
@@ -469,9 +498,10 @@ async function createNewFolder() {
     const file = new File([""], FOLDER_PLACEHOLDER, { type: "text/plain" });
     const ok = await uploadSingleFileWithPath(file, fullPath);
     if (!ok) {
-        await dlgAlert('创建失败', '创建文件夹失败，请重试');
+        showToast('创建文件夹失败', 'error');
         return;
     }
+    showToast(`已创建文件夹 ${trimmed}`, 'success');
     loadFiles();
 }
 

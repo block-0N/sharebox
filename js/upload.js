@@ -18,6 +18,7 @@ async function uploadSingleFileWithPath(file, fullPath) {
 
     if (upErr) {
         console.warn("上传失败", fullPath, upErr.message);
+        showToast(`上传失败：${fullPath}`, 'error');
         return false;
     }
 
@@ -265,13 +266,12 @@ async function doUploadItems(rawItems, showSpeed) {
     }
     updateProgress(totalCount, currentFinished, 'upload', '', finalText);
 
-    if (failCount > 0) {
-        const failedList = failedPaths.slice(0, 5).map(p => escapeHtml(p)).join('\n');
-        const more = failedPaths.length > 5 ? `\n… 等 ${failedPaths.length} 个文件` : '';
-        await dlgAlert(
-            '部分文件上传失败',
-            `共 ${totalCount} 个文件，成功 ${successCount} 个，失败 ${failCount} 个：\n\n${failedList}${more}`
-        );
+    if (failCount === 0) {
+        showToast(`上传完成（${successCount} 个文件）`, 'success');
+    } else if (successCount === 0) {
+        showToast(`上传失败（${failCount} 个文件）`, 'error');
+    } else {
+        showToast(`完成 ${successCount} 个，失败 ${failCount} 个`, 'error');
     }
 
     setTimeout(() => {

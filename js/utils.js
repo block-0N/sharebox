@@ -81,6 +81,47 @@ function showLoadError(container, msg) {
 }
 
 /* ============================================================
+ * Toast 通知
+ * ============================================================ */
+
+/**
+ * 在右下角显示一条 toast
+ * @param {string} message
+ * @param {'success'|'error'|'info'} [type='info']
+ * @param {number} [duration=2500] 毫秒
+ */
+function showToast(message, type = 'info', duration = 2500) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const iconMap = {
+        success: '✓',
+        error: '⚠',
+        info: 'ℹ'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${iconMap[type] || iconMap.info}</span>
+        <span class="toast-msg">${escapeHtml(message)}</span>`;
+
+    container.appendChild(toast);
+
+    const remove = () => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 250);
+    };
+
+    setTimeout(remove, duration);
+}
+
+/* ============================================================
  * 主题切换
  * ============================================================ */
 

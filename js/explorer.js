@@ -1096,10 +1096,11 @@ async function moveItemsTo(items, targetFolder, targetTabId) {
     });
     const { error: insErr } = await sb.from('file_list').insert(newRows);
     if (insErr) {
-        await dlgAlert('移动失败', insErr.message);
+        showToast('移动失败：' + insErr.message, 'error');
         loadFiles();
         return;
     }
 
+    showToast(`已移动 ${items.length} 项`, 'success');
     loadFiles();
 }

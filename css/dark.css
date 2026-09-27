@@ -612,3 +612,11 @@ body.dark .breadcrumb-dropdown-item.active {
     background: #263449;
     color: #5dade2;
 }
+
+/* ---------- Toast ---------- */
+body.dark .toast {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
