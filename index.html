@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.bootcdn.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https://cdn.jsdelivr.net https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in; media-src 'self' blob: https://*.supabase.co https://*.supabase.in; frame-src https://*.supabase.co https://*.supabase.in https://view.officeapps.live.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in; media-src 'self' blob: https://*.supabase.co https://*.supabase.in; frame-src https://*.supabase.co https://*.supabase.in https://view.officeapps.live.com; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2980b9">
     <meta name="mobile-web-app-capable" content="yes">
@@ -150,14 +150,12 @@
         </div>
     </div>
     <!-- 代码高亮 -->
-    <link id="hljsLight" rel="stylesheet" media="all"
-        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
-    <link id="hljsDark" rel="stylesheet" media="not all"
-        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link id="hljsLight" rel="stylesheet" media="all" href="./assets/lib/github.min.css">
+    <link id="hljsDark" rel="stylesheet" media="not all" href="./assets/lib/github-dark.min.css">
+    <script src="./assets/lib/highlight.min.js"></script>
+    <script src="./assets/lib/jszip.min.js"></script>
+    <script src="./assets/lib/marked.min.js"></script>
+    <script src="./assets/lib/supabase-js.js"></script>
 
     <!-- 应用代码（顺序不能变） -->
     <script src="./env.js"></script>
