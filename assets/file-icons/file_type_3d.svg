@@ -1,4 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-	<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M41.727 13.803L23.887 3.5L6.163 13.729l17.84 10.303z" />
-	<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M24.003 24.032L6.163 13.729v20.468L24.003 44.5zm17.724-10.229L24.003 24.032V44.5l17.724-10.229z" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+	<title>STL 3D 文件图标</title>
+	<g fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+		<!-- 立方体三个可见面的外轮廓 -->
+		<path d="M41.727 13.803L23.887 3.5L6.163 13.729l17.84 10.303z" />
+		<path d="M24.003 24.032L6.163 13.729v20.468L24.003 44.5z" />
+		<path d="M41.727 13.803L24.003 24.032V44.5l17.724-10.229z" />
+
+		<!-- 顶面三角网格线 -->
+		<path d="M23.887 3.5L24.003 24.032" />
+		<path d="M41.727 13.803L6.163 13.729" />
+
+		<!-- 左面三角网格线 -->
+		<path d="M6.163 13.729L24.003 44.5" />
+
+		<!-- 右面三角网格线 -->
+		<path d="M41.727 13.803L24.003 44.5" />
+	</g>
 </svg>
