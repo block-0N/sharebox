@@ -22,7 +22,7 @@ const FOLDER_PLACEHOLDER = '.gitkeep';
  * 文件图标（vscode-icons）
  * ============================================================ */
 
-const VSC_ICON_CDN = 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/';
+const VSC_ICON_CDN = './assets/file-icons/';
 const DEFAULT_FILE_ICON = VSC_ICON_CDN + 'default_file.svg';
 const DEFAULT_FOLDER_ICON = VSC_ICON_CDN + 'default_folder.svg';
 
@@ -76,6 +76,35 @@ const FILE_ICON_SVG_MAP = {
     apk: 'file_type_android.svg', deb: 'file_type_debian.svg', rpm: 'file_type_redhat.svg',
     ttf: 'file_type_font.svg', otf: 'file_type_font.svg', woff: 'file_type_font.svg',
     woff2: 'file_type_font.svg', eot: 'file_type_font.svg',
+
+    // ---------- 补充 ----------
+    diff: 'file_type_diff.svg', patch: 'file_type_diff.svg',
+    asm: 'file_type_assembly.svg', s: 'file_type_assembly.svg',
+    coffee: 'file_type_coffeescript.svg',
+    f90: 'file_type_fortran.svg', f95: 'file_type_fortran.svg', for: 'file_type_fortran.svg',
+    vb: 'file_type_vb.svg', vbs: 'file_type_vb.svg',
+    hs: 'file_type_haskell.svg', lhs: 'file_type_haskell.svg',
+    ex: 'file_type_elixir.svg', exs: 'file_type_elixir.svg',
+    erl: 'file_type_erlang.svg', hrl: 'file_type_erlang.svg',
+    clj: 'file_type_clojure.svg', cljs: 'file_type_clojure.svg', cljc: 'file_type_clojure.svg',
+    pas: 'file_type_pascal.svg',
+    pro: 'file_type_prolog.svg',
+    tcl: 'file_type_tcl.svg',
+    vim: 'file_type_vim.svg',
+    gitignore: 'file_type_git.svg', gitattributes: 'file_type_git.svg', gitmodules: 'file_type_git.svg',
+    stl: 'file_type_3d.svg', obj3d: 'file_type_3d.svg', fbx: 'file_type_3d.svg',
+    gltf: 'file_type_3d.svg', glb: 'file_type_3d.svg', dae: 'file_type_3d.svg',
+    '3ds': 'file_type_3d.svg', blend: 'file_type_3d.svg', ply: 'file_type_3d.svg',
+    epub: 'file_type_ebook.svg', mobi: 'file_type_ebook.svg', azw: 'file_type_ebook.svg',
+    azw3: 'file_type_ebook.svg', fb2: 'file_type_ebook.svg', djvu: 'file_type_ebook.svg',
+    pem: 'file_type_certificate.svg', crt: 'file_type_certificate.svg', cer: 'file_type_certificate.svg',
+    odt: 'file_type_openoffice.svg', ods: 'file_type_openoffice.svg', odp: 'file_type_openoffice.svg',
+    bin: 'file_type_binary.svg', dat: 'file_type_binary.svg',
+    styl: 'file_type_stylus.svg',
+    xaml: 'file_type_xaml.svg',
+    fs: 'file_type_fsharp.svg', fsx: 'file_type_fsharp.svg',
+    ml: 'file_type_ocaml.svg', mli: 'file_type_ocaml.svg',
+    scpt: 'file_type_applescript.svg',
 };
 
 /* ============================================================
