@@ -322,9 +322,9 @@ function enterBreadcrumbEdit() {
 
     // 用 wrap 包住 input 和下拉框，方便定位
     bar.innerHTML = '';
+    bar.classList.add('editing');   // ← 解除 overflow 裁剪
     const wrap = document.createElement('div');
-    wrap.style.position = 'relative';
-    wrap.style.width = '100%';
+    wrap.className = 'breadcrumb-edit-wrap';
     bar.appendChild(wrap);
 
     const input = document.createElement('input');
@@ -396,6 +396,7 @@ function enterBreadcrumbEdit() {
     const finish = (save, pathOverride) => {
         if (!breadcrumbEditLock) return;
         breadcrumbEditLock = false;
+        bar.classList.remove('editing');   // ← 恢复
 
         if (save) {
             const val = (pathOverride !== undefined ? pathOverride : input.value).trim();
@@ -522,9 +523,11 @@ function renderFileList() {
         <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(name)}">
             <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
             <span class="fe-name">${escapeHtml(name)}</span>
+            <span class="fe-meta fe-type">文件夹</span>
             <span class="fe-meta fe-size">${sizeText}</span>
             <span class="fe-meta fe-mtime">${mtimeText}</span>
             <span class="fe-actions">
+                <button class="fe-btn" data-action="open-folder" type="button">打开</button>
                 <button class="fe-btn" data-action="zip" type="button">打包</button>
                 <button class="fe-btn del" data-action="del-folder" type="button">删除</button>
             </span>
@@ -535,6 +538,7 @@ function renderFileList() {
         const openBtn = `<button class="fe-btn" data-action="open" type="button">打开</button>`;
         const sizeText = formatBytes(file._size || 0);
         const mtimeText = formatTime(file._mtime);
+        const typeText = getFileTypeLabel(file.displayName);
         html += `
     <div class="fe-item fe-file"
          data-type="file"
@@ -544,6 +548,7 @@ function renderFileList() {
         <span class="fe-icon"><img src="${getFileIconUrl(file.displayName)}" alt=""
         onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
         <span class="fe-name">${escapeHtml(file.displayName)}</span>
+        <span class="fe-meta fe-type">${escapeHtml(typeText)}</span>
         <span class="fe-meta fe-size">${sizeText}</span>
         <span class="fe-meta fe-mtime">${mtimeText}</span>
         <span class="fe-actions">
@@ -643,7 +648,13 @@ function initExplorerEvents() {
             const name = item.dataset.name;
             const currentPath = getCurrentPath();
 
-            if (action === "zip") {
+            if (action === "open-folder") {
+                const currentPath = getCurrentPath();
+                currentPath.push(name);
+                setCurrentPath(currentPath);
+                renderExplorer();
+                updateActiveTabTitle();
+            } else if (action === "zip") {
                 downloadFolderZip(buildFullPath(currentPath, name));
             } else if (action === "del-folder") {
                 delFolder(buildFullPath(currentPath, name));

@@ -9,9 +9,10 @@ html {
 body {
     background-color: #f0f4f8;
     color: #2980b9;
-    max-width: 1000px;
+    width: 100%;
+    max-width: 1600px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 16px clamp(16px, 2vw, 32px);
     line-height: 1.6;
     height: 100vh;
     height: 100dvh;

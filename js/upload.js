@@ -92,15 +92,110 @@ function updateProgress(total, finished, type = 'upload', estimateText = '', fin
     }
 }
 
-/* ============================================================
+/**
+ * 判断一个上传路径是否包含隐藏项（以 . 开头的文件或目录）
+ * @param {string} path
+ * @returns {boolean}
+ */
+function isHiddenPath(path) {
+    const segments = String(path || '').split('/').filter(Boolean);
+    return segments.some(seg => seg.startsWith('.'));
+}
+
+/**
+ * 过滤隐藏项：检测到隐藏文件时弹窗询问
+ * @param {Array<{file: File, path: string}>} items
+ * @returns {Promise<Array|null>} 返回处理后的列表，或 null 表示取消
+ */
+async function filterHiddenItems(items) {
+    const hidden = items.filter(it => isHiddenPath(it.path));
+    if (hidden.length === 0) return items;
+
+    const previewPaths = hidden.slice(0, 5).map(it => it.path);
+    const preview = previewPaths.join('\n')
+        + (hidden.length > 5 ? `\n… 等 ${hidden.length} 项` : '');
+
+    const msg = `检测到 ${hidden.length} 个隐藏文件/文件夹：\n\n${preview}\n\n是否一并上传？`;
+
+    const choice = await dlgChoose(
+        '发现隐藏文件',
+        msg,
+        [
+            { label: '全部上传', value: 'all', primary: true },
+            { label: '跳过隐藏', value: 'skip' },
+            { label: '取消上传', value: 'cancel' }
+        ]
+    );
+
+    if (choice === 'all') return items;
+    if (choice === 'skip') return items.filter(it => !isHiddenPath(it.path));
+    return null;
+}
+
+/**
  * 通用上传：接收 {file, path} 列表，带 rAF 进度条
- * ============================================================ */
+ */
+async function doUploadItems(rawItems, showSpeed) {
+    if (rawItems.length === 0) return;
 
-async function doUploadItems(items, showSpeed) {
-    if (items.length === 0) return;
+    // 过滤隐藏文件
+    const items = await filterHiddenItems(rawItems);
+    if (!items) return;
+    if (items.length === 0) {
+        await dlgAlert('提示', '没有可上传的文件（已全部跳过）');
+        return;
+    }
 
-    const totalCount = items.length;
-    const totalBytes = items.reduce((sum, it) => sum + it.file.size, 0);
+    // 检测同名冲突
+    /** @type {Map<string, any>} path → 已存在的文件记录 */
+    const conflictMap = new Map();
+    for (const it of items) {
+        const parts = it.path.split('/').filter(Boolean);
+        const filename = parts.pop();
+        const parentPath = parts;
+        const parent = getNodeByPath(parentPath);
+        if (parent && parent._files[filename]) {
+            conflictMap.set(it.path, parent._files[filename]);
+        }
+    }
+
+    let finalItems = items;
+    let overwrite = false;
+
+    if (conflictMap.size > 0) {
+        const previewList = [...conflictMap.keys()].slice(0, 5).join('\n');
+        const more = conflictMap.size > 5 ? `\n… 等 ${conflictMap.size} 个文件` : '';
+        const msg = `检测到 ${conflictMap.size} 个同名文件：\n\n${previewList}${more}\n\n如何处理？`;
+
+        const choice = await dlgChoose(
+            '文件已存在',
+            msg,
+            [
+                { label: '覆盖', value: 'overwrite', primary: true },
+                { label: '保留两者', value: 'keep-both' },
+                { label: '取消上传', value: 'cancel' }
+            ]
+        );
+        if (!choice || choice === 'cancel') return;
+
+        if (choice === 'overwrite') {
+            overwrite = true;
+        } else {
+            // 保留两者：给每个冲突文件改名
+            finalItems = items.map(it => {
+                if (!conflictMap.has(it.path)) return it;
+                const parts = it.path.split('/').filter(Boolean);
+                const filename = parts.pop();
+                const parentPath = parts;
+                const newName = resolveNameConflict(parentPath, filename);
+                const newPath = [...parentPath, newName].join('/');
+                return { file: it.file, path: newPath };
+            });
+        }
+    }
+
+    const totalCount = finalItems.length;
+    const totalBytes = finalItems.reduce((sum, it) => sum + it.file.size, 0);
 
     let currentFinished = 0;
     let totalUploadBytes = 0;
@@ -136,10 +231,23 @@ async function doUploadItems(items, showSpeed) {
 
     let successCount = 0;
     let failCount = 0;
-    for (const { file, path } of items) {
+    const failedPaths = [];
+
+    for (const { file, path } of finalItems) {
+        // 覆盖模式：先删旧文件
+        if (overwrite && conflictMap.has(path)) {
+            const old = conflictMap.get(path);
+            try {
+                await sb.storage.from("public_netdisk").remove([old.storage_path]);
+                await sb.from("file_list").delete().eq("id", old.id);
+            } catch (e) {
+                console.warn("删除旧文件失败", e);
+            }
+        }
+
         const ok = await uploadSingleFileWithPath(file, path);
         if (ok) successCount++;
-        else failCount++;
+        else { failCount++; failedPaths.push(path); }
         currentFinished++;
         totalUploadBytes += file.size;
     }
@@ -156,6 +264,15 @@ async function doUploadItems(items, showSpeed) {
         finalText = `完成 ${successCount} 个，失败 ${failCount} 个`;
     }
     updateProgress(totalCount, currentFinished, 'upload', '', finalText);
+
+    if (failCount > 0) {
+        const failedList = failedPaths.slice(0, 5).map(p => escapeHtml(p)).join('\n');
+        const more = failedPaths.length > 5 ? `\n… 等 ${failedPaths.length} 个文件` : '';
+        await dlgAlert(
+            '部分文件上传失败',
+            `共 ${totalCount} 个文件，成功 ${successCount} 个，失败 ${failCount} 个：\n\n${failedList}${more}`
+        );
+    }
 
     setTimeout(() => {
         updateProgress(0, 0, 'upload');
@@ -317,55 +434,16 @@ async function traverseEntries(entries) {
     const totalCount = allEntries.length;
     if (totalCount === 0) return;
 
-    let currentFinished = 0;
-    const startTs = performance.now();
-    let rafId = null;
-    let isDone = false;
-
-    function renderLoop() {
-        if (isDone) return;
-        rafId = requestAnimationFrame(renderLoop);
-        const costMs = performance.now() - startTs;
-        let estimateText = "预计剩余 计算中…";
-        if (currentFinished > 0 && costMs > 0) {
-            const speed = currentFinished / costMs;
-            const remainMs = (totalCount - currentFinished) / speed;
-            estimateText = formatMs(remainMs);
-        }
-        updateProgress(totalCount, currentFinished, 'upload', estimateText);
-    }
-    rafId = requestAnimationFrame(renderLoop);
-
     const basePath = getCurrentPath();
-    let successCount = 0;
-    let failCount = 0;
+    const items = [];
     for (const entry of allEntries) {
         const file = await getFileFromEntry(entry);
         const rel = String(entry.fullPath || file.name).replace(/^\/+/, '');
         const targetPath = buildFullPath(basePath, rel);
-        const ok = await uploadSingleFileWithPath(file, targetPath);
-        if (ok) successCount++;
-        else failCount++;
-        currentFinished++;
+        items.push({ file, path: targetPath });
     }
 
-    isDone = true;
-    cancelAnimationFrame(rafId);
-
-    let finalText;
-    if (failCount === 0) {
-        finalText = `上传完成（${successCount} 个文件）`;
-    } else if (successCount === 0) {
-        finalText = `上传失败（${failCount} 个文件）`;
-    } else {
-        finalText = `完成 ${successCount} 个，失败 ${failCount} 个`;
-    }
-    updateProgress(totalCount, currentFinished, 'upload', '', finalText);
-
-    setTimeout(() => {
-        updateProgress(0, 0, 'upload');
-        loadFiles();
-    }, 1500);
+    await doUploadItems(items, false);
 }
 
 async function getFileFromEntry(entry) {
