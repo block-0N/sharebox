@@ -24,17 +24,60 @@
 
 .chat-input-row {
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chat-input-top {
+    display: flex;
     gap: 8px;
     align-items: center;
 }
 
-.chat-input-row input {
+.chat-input-top input#userName {
     flex: 1;
+    min-width: 0;
     margin: 0;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.4;
+    outline: none;
+    background: #fff;
+    color: #2c3e50;
+    box-sizing: border-box;
 }
 
-.chat-input-row input#userName {
-    flex: 0 0 120px;
+.chat-input-top button {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 9px 24px;
+}
+
+.chat-input-row textarea {
+    width: 100%;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.4;
+    outline: none;
+    background: #fff;
+    color: #2c3e50;
+    box-sizing: border-box;
+    resize: none;
+    overflow-y: auto;
+    min-height: 76px;
+    max-height: 200px;
+}
+
+.chat-input-top input#userName:focus,
+.chat-input-row textarea:focus {
+    border-color: #2980b9;
 }
 
 .chat-input-row button {
@@ -80,4 +123,145 @@
 .msg-del:hover {
     background: #ef4444;
     color: #fff;
+}
+
+/* ============================================================
+ * 聊天消息里的 Markdown 渲染
+ * ============================================================ */
+
+.msg-body {
+    display: inline;
+}
+
+/* 首段跟随行内，后续段落换行（让单行消息看起来像普通聊天） */
+.msg-body>p {
+    display: inline;
+    margin: 0;
+}
+
+.msg-body>p+p {
+    display: block;
+    margin-top: 4px;
+}
+
+.msg-body code {
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #be185d;
+    white-space: normal;
+}
+
+.msg-body pre {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    margin: 6px 0;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre;
+}
+
+.msg-body pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
+.msg-body a {
+    color: #2980b9;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(41, 128, 185, 0.3);
+    word-break: break-all;
+}
+
+.msg-body a:hover {
+    border-bottom-color: #2980b9;
+}
+
+.msg-body ul,
+.msg-body ol {
+    margin: 4px 0;
+    padding-left: 22px;
+}
+
+.msg-body li {
+    margin: 2px 0;
+}
+
+.msg-body blockquote {
+    margin: 6px 0;
+    padding: 4px 12px;
+    border-left: 3px solid #b8d4e8;
+    background: #f8fbfe;
+    color: #475569;
+    border-radius: 0 4px 4px 0;
+}
+
+.msg-body h1,
+.msg-body h2,
+.msg-body h3,
+.msg-body h4,
+.msg-body h5,
+.msg-body h6 {
+    margin: 8px 0 4px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.msg-body h1 {
+    font-size: 1.2em;
+}
+
+.msg-body h2 {
+    font-size: 1.15em;
+}
+
+.msg-body h3 {
+    font-size: 1.1em;
+}
+
+.msg-body hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 8px 0;
+}
+
+.msg-body img {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 6px;
+    display: block;
+    margin: 4px 0;
+}
+
+.msg-body table {
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 13px;
+}
+
+.msg-body th,
+.msg-body td {
+    border: 1px solid #e2e8f0;
+    padding: 4px 8px;
+    text-align: left;
+}
+
+.msg-body th {
+    background: #f1f5f9;
+    font-weight: 600;
+}
+
+.msg-body strong {
+    font-weight: 600;
+}
+
+.msg-body del {
+    color: #94a3b8;
 }

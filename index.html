@@ -45,9 +45,11 @@
                 </div>
                 <div id="msgBox"></div>
                 <div class="chat-input-row">
-                    <input id="userName" placeholder="昵称" value="匿名用户">
-                    <input id="msgInput" placeholder="输入消息">
-                    <button onclick="sendMsg()" type="button">发送</button>
+                    <div class="chat-input-top">
+                        <input id="userName" placeholder="昵称" value="匿名用户">
+                        <button onclick="sendMsg()" type="button">发送</button>
+                    </div>
+                    <textarea id="msgInput" placeholder="输入消息（Enter 发送，Shift+Enter 换行）" rows="3"></textarea>
                 </div>
             </div>
         </div>
@@ -141,6 +143,7 @@
             <div class="viewer-header">
                 <span class="viewer-title" id="viewerTitle">文件预览</span>
                 <div class="viewer-actions">
+                    <button class="fe-btn" id="viewerShare" type="button">分享</button>
                     <button class="fe-btn" id="viewerCopy" type="button">复制</button>
                     <button class="fe-btn" id="viewerDownload" type="button">下载</button>
                     <button class="fe-btn del" id="viewerClose" type="button">关闭</button>

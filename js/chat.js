@@ -2,6 +2,38 @@
  * 聊天室
  * ============================================================ */
 
+/* ============================================================
+ * 聊天内容 Markdown 渲染
+ * ============================================================ */
+function renderChatMarkdown(text) {
+    const src = String(text || '');
+    if (!src) return '';
+    if (!window.marked) return escapeHtml(src).replace(/\n/g, '<br>');
+
+    // 自定义 renderer：禁用 raw HTML，防 XSS
+    const renderer = new marked.Renderer();
+    renderer.html = (arg) => {
+        const raw = typeof arg === 'string' ? arg : (arg && arg.text) || '';
+        return escapeHtml(raw);
+    };
+
+    let html;
+    try {
+        html = marked.parse(src, {
+            gfm: true,
+            breaks: true,
+            renderer
+        });
+    } catch (e) {
+        console.warn('Markdown 渲染失败，回退纯文本', e);
+        return escapeHtml(src).replace(/\n/g, '<br>');
+    }
+
+    // 所有链接：新窗口打开
+    html = html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+    return html;
+}
+
 /** 用于丢弃过期的加载结果 */
 let loadMessagesToken = 0;
 
@@ -53,7 +85,10 @@ function renderMsg(list) {
     }
     box.innerHTML = list.map(i => `
         <div class="msg-item" data-id="${i.id}">
-            <span class="msg-content">[${new Date(i.created_at).toLocaleString()}] <b>${escapeHtml(i.username)}</b>：${escapeHtml(i.content)}</span>
+            <span class="msg-content">
+                <span class="msg-meta">[${new Date(i.created_at).toLocaleString()}] <b>${escapeHtml(i.username)}</b>：</span>
+                <span class="msg-body">${renderChatMarkdown(i.content)}</span>
+            </span>
             <button class="msg-del" type="button" title="删除此消息">×</button>
         </div>`).join("");
     box.scrollTop = box.scrollHeight;
@@ -63,8 +98,9 @@ function renderMsg(list) {
  * 发送消息
  */
 async function sendMsg() {
+    const input = document.getElementById("msgInput");
     const name = document.getElementById("userName").value || "匿名";
-    const content = document.getElementById("msgInput").value.trim();
+    const content = input.value.trim();
     if (!content) return;
     const { error } = await sb.from("messages").insert({ username: name, content });
     if (error) {
@@ -72,7 +108,35 @@ async function sendMsg() {
         await dlgAlert("发送失败", error.message);
         return;
     }
-    document.getElementById("msgInput").value = "";
+    input.value = "";
+    autoResizeChatInput();
+}
+
+/** 输入框高度随内容自适应（1~6 行） */
+function autoResizeChatInput() {
+    const input = document.getElementById('msgInput');
+    if (!input) return;
+    input.style.height = 'auto';
+    const minH = 76;
+    const maxH = 200;
+    const h = Math.max(input.scrollHeight, minH);
+    input.style.height = Math.min(h, maxH) + 'px';
+}
+
+/** 初始化聊天输入：Enter 发送、Shift+Enter 换行 */
+function initChatInput() {
+    const input = document.getElementById('msgInput');
+    if (!input) return;
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            sendMsg();
+        }
+    });
+
+    input.addEventListener('input', autoResizeChatInput);
+    autoResizeChatInput();
 }
 
 /**

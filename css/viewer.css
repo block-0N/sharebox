@@ -183,8 +183,22 @@
 }
 
 .zip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
     margin-right: 6px;
-    font-size: 16px;
+    vertical-align: middle;
+}
+
+.zip-icon img {
+    width: 16px;
+    height: 16px;
+    display: block;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
 .zip-size,

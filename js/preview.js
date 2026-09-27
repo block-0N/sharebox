@@ -65,6 +65,25 @@ function initTextViewer() {
             await dlgAlert('复制失败', '可能浏览器未授予剪贴板权限');
         }
     });
+    document.getElementById('viewerShare').addEventListener('click', async () => {
+        if (!viewerCurrentFile) return;
+        const url = viewerCurrentFile.file_url;
+        if (!url) {
+            await dlgAlert('无法分享', '该文件没有可用的分享链接');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(url);
+            const btn = document.getElementById('viewerShare');
+            const old = btn.textContent;
+            btn.textContent = '✓ 已复制';
+            setTimeout(() => { btn.textContent = old; }, 1200);
+            showToast('分享链接已复制到剪贴板', 'success');
+        } catch (err) {
+            console.error('复制分享链接失败', err);
+            await dlgAlert('复制失败', '可能浏览器未授予剪贴板权限');
+        }
+    });
     overlay.addEventListener('click', e => {
         if (e.target === overlay) closeTextViewer();
     });
@@ -292,7 +311,9 @@ async function openZipViewer(file) {
 
         let rowsHtml = '';
         for (const e of rows) {
-            const icon = e.dir ? '📁' : '📄';
+            const icon = e.dir
+                ? `<img src="${DEFAULT_FOLDER_ICON}" alt="">`
+                : `<img src="${getFileIconUrl(e.name)}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'">`;
             const sizeText = e.dir ? '' : formatBytes(e.size);
             const ratio = (!e.dir && e.size > 0)
                 ? ((1 - e.compressed / e.size) * 100).toFixed(0) + '%'

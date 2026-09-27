@@ -104,7 +104,8 @@ body.dark .msg-item {
     color: #cbd5e1;
 }
 
-body.dark .chat-input-row input {
+body.dark .chat-input-top input#userName,
+body.dark .chat-input-row textarea {
     background: #172033;
     color: #e2e8f0;
     border-color: #475569;
@@ -649,4 +650,58 @@ body.dark .toast.toast-error .toast-icon {
 body.dark .toast.toast-info .toast-icon {
     background: #1e3a5f;
     color: #5dade2;
+}
+
+/* ---------- 聊天 Markdown ---------- */
+body.dark .msg-body code {
+    background: #263449;
+    color: #f472b6;
+}
+
+body.dark .msg-body pre {
+    background: #111827;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+body.dark .msg-body a {
+    color: #5dade2;
+    border-bottom-color: rgba(93, 173, 226, 0.3);
+}
+
+body.dark .msg-body a:hover {
+    border-bottom-color: #5dade2;
+}
+
+body.dark .msg-body blockquote {
+    background: #172033;
+    border-left-color: #2d4258;
+    color: #94a3b8;
+}
+
+body.dark .msg-body h1,
+body.dark .msg-body h2,
+body.dark .msg-body h3,
+body.dark .msg-body h4,
+body.dark .msg-body h5,
+body.dark .msg-body h6 {
+    color: #f1f5f9;
+}
+
+body.dark .msg-body hr {
+    border-top-color: #334155;
+}
+
+body.dark .msg-body th,
+body.dark .msg-body td {
+    border-color: #334155;
+}
+
+body.dark .msg-body th {
+    background: #172033;
+    color: #cbd5e1;
+}
+
+body.dark .msg-body del {
+    color: #64748b;
 }

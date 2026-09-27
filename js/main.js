@@ -7,6 +7,7 @@ initThemeToggle();
 initNotifyToggle();
 initTextViewer();
 initChatEvents();
+initChatInput();
 
 // 2. 标签页要在 explorer 事件之前，因为 explorer 依赖 activeTabId
 initMainTabs();
