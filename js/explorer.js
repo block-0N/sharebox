@@ -32,6 +32,16 @@ function setView(v) {
     if (t) t.view = v;
 }
 
+function getViewMode() {
+    const t = getCurrentTab();
+    return t ? (t.viewMode || 'details') : 'details';
+}
+
+function setViewMode(mode) {
+    const t = getCurrentTab();
+    if (t) t.viewMode = mode;
+}
+
 function getSort() {
     const t = getCurrentTab();
     return t ? { key: t.sortKey, asc: t.sortAsc } : { key: 'name', asc: true };
@@ -502,8 +512,8 @@ function renderFileList() {
     }
 
     const view = getView();
-    if (view === 'quick') { renderQuickAccess(wrap); return; }
-    if (view === 'favorites') { renderFavorites(wrap); return; }
+    if (view === 'quick') { wrap.dataset.view = 'details'; renderQuickAccess(wrap); return; }
+    if (view === 'favorites') { wrap.dataset.view = 'details'; renderFavorites(wrap); return; }
 
     const currentPath = getCurrentPath();
     const node = getNodeByPath(currentPath);
@@ -512,9 +522,12 @@ function renderFileList() {
         return;
     }
 
+    const viewMode = getViewMode();
+    wrap.dataset.view = viewMode;
+
     const { key: sortKey, asc: sortAsc } = getSort();
 
-    const folders = Object.keys(node._children).sort((a, b) => {
+    const folderNames = Object.keys(node._children).sort((a, b) => {
         const na = node._children[a];
         const nb = node._children[b];
         let v = 0;
@@ -548,24 +561,154 @@ function renderFileList() {
         return sortAsc ? v : -v;
     });
 
-    if (folders.length === 0 && files.length === 0) {
+    if (folderNames.length === 0 && files.length === 0) {
         wrap.innerHTML = `<div class="nofile">此文件夹为空</div>`;
         return;
     }
 
-    let html = "";
+    const folderItems = folderNames.map(name => ({ name, node: node._children[name] }));
 
-    for (const name of folders) {
-        const folderNode = node._children[name];
-        const sizeText = formatBytes(folderNode._totalSize || 0);
-        const mtimeText = formatTime(folderNode._latestMtime);
+    switch (viewMode) {
+        case 'small':
+        case 'medium':
+        case 'large':
+        case 'xlarge':
+            wrap.innerHTML = renderItemGrid(folderItems, files, viewMode);
+            break;
+        case 'tile':
+            wrap.innerHTML = renderItemTile(folderItems, files);
+            break;
+        case 'list':
+            wrap.innerHTML = renderItemList(folderItems, files);
+            break;
+        case 'content':
+            wrap.innerHTML = renderItemContent(folderItems, files);
+            break;
+        case 'details':
+        default:
+            wrap.innerHTML = renderDetailsHeader() + renderItemDetails(folderItems, files);
+            break;
+    }
+    wrap.scrollTop = 0;
+}
+
+/* ============================================================
+ * 7 种视图渲染
+ * ============================================================ */
+
+function getGridIconUrl(name, url, viewMode) {
+    if (viewMode && (viewMode === 'small' || viewMode === 'medium' || viewMode === 'large' || viewMode === 'xlarge' || viewMode === 'tile')) {
+        if (url && isImageFile(name)) return url;
+    }
+    return getFileIconUrl(name);
+}
+
+function renderItemGrid(folders, files, sizeClass) {
+    let html = `<div class="fe-grid">`;
+    for (const f of folders) {
         html += `
-        <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(name)}">
+        <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(f.name)}">
             <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
-            <span class="fe-name">${escapeHtml(name)}</span>
+            <span class="fe-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+        </div>`;
+    }
+    for (const fi of files) {
+        const iconUrl = getGridIconUrl(fi.displayName, fi.file_url, sizeClass);
+        html += `
+        <div class="fe-item fe-file"
+             data-type="file"
+             data-name="${escapeHtml(fi.displayName)}"
+             data-id="${escapeHtml(fi.id)}"
+             data-path="${escapeHtml(fi.storage_path)}">
+            <span class="fe-icon"><img src="${iconUrl}" alt=""
+                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <span class="fe-name" title="${escapeHtml(fi.displayName)}">${escapeHtml(fi.displayName)}</span>
+        </div>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+function renderItemTile(folders, files) {
+    let html = `<div class="fe-tile-wrap">`;
+    for (const f of folders) {
+        html += `
+        <div class="fe-item fe-folder fe-tile" data-type="folder" data-name="${escapeHtml(f.name)}">
+            <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
+            <div class="fe-tile-info">
+                <div class="fe-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+                <div class="fe-tile-meta">文件夹 · ${formatBytes(f.node._totalSize || 0)}</div>
+            </div>
+        </div>`;
+    }
+    for (const fi of files) {
+        const iconUrl = getGridIconUrl(fi.displayName, fi.file_url, 'tile');
+        html += `
+        <div class="fe-item fe-file fe-tile"
+             data-type="file"
+             data-name="${escapeHtml(fi.displayName)}"
+             data-id="${escapeHtml(fi.id)}"
+             data-path="${escapeHtml(fi.storage_path)}">
+            <span class="fe-icon"><img src="${iconUrl}" alt=""
+                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <div class="fe-tile-info">
+                <div class="fe-name" title="${escapeHtml(fi.displayName)}">${escapeHtml(fi.displayName)}</div>
+                <div class="fe-tile-meta">${escapeHtml(getFileTypeLabel(fi.displayName))} · ${formatBytes(fi._size || 0)}</div>
+            </div>
+        </div>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+function renderItemList(folders, files) {
+    let html = `<div class="fe-list-view">`;
+    for (const f of folders) {
+        html += `
+        <div class="fe-item fe-folder fe-list-item" data-type="folder" data-name="${escapeHtml(f.name)}">
+            <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
+            <span class="fe-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+        </div>`;
+    }
+    for (const fi of files) {
+        html += `
+        <div class="fe-item fe-file fe-list-item"
+             data-type="file"
+             data-name="${escapeHtml(fi.displayName)}"
+             data-id="${escapeHtml(fi.id)}"
+             data-path="${escapeHtml(fi.storage_path)}">
+            <span class="fe-icon"><img src="${getFileIconUrl(fi.displayName)}" alt=""
+                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <span class="fe-name" title="${escapeHtml(fi.displayName)}">${escapeHtml(fi.displayName)}</span>
+        </div>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+function renderDetailsHeader() {
+    const { key, asc } = getSort();
+    const arrow = (k) => key === k ? (asc ? ' ↑' : ' ↓') : '';
+    return `
+    <div class="details-header">
+        <div class="dh dh-name" data-col="name">名称${arrow('name')}</div>
+        <div class="dh dh-type" data-col="type">类型${arrow('type')}</div>
+        <div class="dh dh-size" data-col="size">大小${arrow('size')}</div>
+        <div class="dh dh-mtime" data-col="mtime">修改日期${arrow('mtime')}</div>
+        <div class="dh dh-actions"></div>
+    </div>`;
+}
+
+function renderItemDetails(folders, files) {
+    let html = '';
+    for (const f of folders) {
+        html += `
+        <div class="fe-item fe-folder" data-type="folder" data-name="${escapeHtml(f.name)}">
+            <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
+            <span class="fe-name">${escapeHtml(f.name)}</span>
             <span class="fe-meta fe-type">文件夹</span>
-            <span class="fe-meta fe-size">${sizeText}</span>
-            <span class="fe-meta fe-mtime">${mtimeText}</span>
+            <span class="fe-meta fe-size">${formatBytes(f.node._totalSize || 0)}</span>
+            <span class="fe-meta fe-mtime">${formatTime(f.node._latestMtime)}</span>
             <span class="fe-actions">
                 <button class="fe-btn" data-action="open-folder" type="button">打开</button>
                 <button class="fe-btn" data-action="zip" type="button">打包</button>
@@ -573,41 +716,83 @@ function renderFileList() {
             </span>
         </div>`;
     }
-
-    for (const file of files) {
-        const openBtn = `<button class="fe-btn" data-action="open" type="button">打开</button>`;
-        const sizeText = formatBytes(file._size || 0);
-        const mtimeText = formatTime(file._mtime);
-        const typeText = getFileTypeLabel(file.displayName);
+    for (const fi of files) {
+        const sizeText = formatBytes(fi._size || 0);
+        const mtimeText = formatTime(fi._mtime);
+        const typeText = getFileTypeLabel(fi.displayName);
         html += `
-    <div class="fe-item fe-file"
-         data-type="file"
-         data-name="${escapeHtml(file.displayName)}"
-         data-id="${escapeHtml(file.id)}"
-         data-path="${escapeHtml(file.storage_path)}">
-        <span class="fe-icon"><img src="${getFileIconUrl(file.displayName)}" alt=""
-        onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
-        <span class="fe-name">${escapeHtml(file.displayName)}</span>
-        <span class="fe-meta fe-type">${escapeHtml(typeText)}</span>
-        <span class="fe-meta fe-size">${sizeText}</span>
-        <span class="fe-meta fe-mtime">${mtimeText}</span>
-        <span class="fe-actions">
-            ${openBtn}
-            <button class="fe-btn" data-action="download" type="button">下载</button>
-            <button class="fe-btn del" data-action="del-file" type="button">删除</button>
-        </span>
-    </div>`;
+        <div class="fe-item fe-file"
+             data-type="file"
+             data-name="${escapeHtml(fi.displayName)}"
+             data-id="${escapeHtml(fi.id)}"
+             data-path="${escapeHtml(fi.storage_path)}">
+            <span class="fe-icon"><img src="${getFileIconUrl(fi.displayName)}" alt=""
+                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <span class="fe-name">${escapeHtml(fi.displayName)}</span>
+            <span class="fe-meta fe-type">${escapeHtml(typeText)}</span>
+            <span class="fe-meta fe-size">${sizeText}</span>
+            <span class="fe-meta fe-mtime">${mtimeText}</span>
+            <span class="fe-actions">
+                <button class="fe-btn" data-action="open" type="button">打开</button>
+                <button class="fe-btn" data-action="download" type="button">下载</button>
+                <button class="fe-btn del" data-action="del-file" type="button">删除</button>
+            </span>
+        </div>`;
     }
-
-    wrap.innerHTML = html;
-    if (pendingScrollTop !== null) {
-        wrap.scrollTop = pendingScrollTop;
-        pendingScrollTop = null;
-    } else {
-        wrap.scrollTop = 0;
-    }
+    return html;
 }
 
+function renderItemContent(folders, files) {
+    let html = '';
+    for (const f of folders) {
+        html += `
+        <div class="fe-item fe-folder fe-content-item" data-type="folder" data-name="${escapeHtml(f.name)}">
+            <span class="fe-icon"><img src="${DEFAULT_FOLDER_ICON}" alt=""></span>
+            <div class="fe-content-info">
+                <div class="fe-content-line">
+                    <span class="fe-name">${escapeHtml(f.name)}</span>
+                    <span class="fe-meta fe-mtime">${formatTime(f.node._latestMtime) || ''}</span>
+                </div>
+                <div class="fe-content-line">
+                    <span class="fe-meta fe-type">文件夹</span>
+                    <span class="fe-meta fe-size">${formatBytes(f.node._totalSize || 0)}</span>
+                </div>
+            </div>
+            <span class="fe-actions">
+                <button class="fe-btn" data-action="open-folder" type="button">打开</button>
+                <button class="fe-btn" data-action="zip" type="button">打包</button>
+                <button class="fe-btn del" data-action="del-folder" type="button">删除</button>
+            </span>
+        </div>`;
+    }
+    for (const fi of files) {
+        html += `
+        <div class="fe-item fe-file fe-content-item"
+             data-type="file"
+             data-name="${escapeHtml(fi.displayName)}"
+             data-id="${escapeHtml(fi.id)}"
+             data-path="${escapeHtml(fi.storage_path)}">
+            <span class="fe-icon"><img src="${getFileIconUrl(fi.displayName)}" alt=""
+                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <div class="fe-content-info">
+                <div class="fe-content-line">
+                    <span class="fe-name">${escapeHtml(fi.displayName)}</span>
+                    <span class="fe-meta fe-mtime">${formatTime(fi._mtime) || ''}</span>
+                </div>
+                <div class="fe-content-line">
+                    <span class="fe-meta fe-type">${escapeHtml(getFileTypeLabel(fi.displayName))}</span>
+                    <span class="fe-meta fe-size">${formatBytes(fi._size || 0)}</span>
+                </div>
+            </div>
+            <span class="fe-actions">
+                <button class="fe-btn" data-action="open" type="button">打开</button>
+                <button class="fe-btn" data-action="download" type="button">下载</button>
+                <button class="fe-btn del" data-action="del-file" type="button">删除</button>
+            </span>
+        </div>`;
+    }
+    return html;
+}
 function renderSearchResults(wrap, query) {
     const all = [];
     collectAllFiles(fileTree, '', all);
@@ -681,6 +866,16 @@ function initExplorerEvents() {
 
     list.addEventListener("click", e => {
         if (isClickSuppressed()) return;
+
+        const dh = e.target.closest('.dh[data-col]');
+        if (dh) {
+            const col = dh.dataset.col;
+            const { key, asc } = getSort();
+            if (key === col) setSort(col, !asc);
+            else setSort(col, col === 'name' || col === 'type');
+            renderFileList();
+            return;
+        }
 
         const btn = e.target.closest("button[data-action]");
         if (btn) {
@@ -962,17 +1157,15 @@ function initRubberBand() {
     const list = document.getElementById('fileList');
     if (!list) return;
 
-    list.addEventListener('mousedown', e => {
+    list.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
         if (e.target.closest('button')) return;
         if (e.target.closest('#contextMenu')) return;
         if (e.target.closest('.context-submenu')) return;
-        // ★ 快速访问/收藏夹项不参与框选和拖拽
         if (e.target.closest('.quick-item') || e.target.closest('.fav-item')) return;
 
         const item = e.target.closest('.fe-item');
 
-        // ★ 记录点击前的选中状态（click 时再读，此时 mouseup 已经改过选择）
         lastMousedownItemEl = item;
         lastMousedownSoleSelected = !!(
             item
@@ -980,7 +1173,8 @@ function initRubberBand() {
             && list.querySelectorAll('.fe-item.selected').length === 1
         );
 
-        // 起点在已选中的条目上 → 拖拽移动
+        // ★ 不在 pointerdown 里捕获指针！等真正移动超过阈值再捕获，
+        //   否则 click/dblclick 的 target 会被隐式改成 list，破坏单击/双击。
         if (item && item.classList.contains('selected')) {
             dragMoveState = {
                 startX: e.clientX,
@@ -990,46 +1184,78 @@ function initRubberBand() {
                 hoverFolder: null,
                 hoverTab: null,
                 items: getSelectedItems(),
-                startItem: item
+                startItem: item,
+                pointerId: e.pointerId
             };
             return;
         }
 
-        // 其他情况 → 框选
         dragState = {
             startX: e.clientX,
             startY: e.clientY,
             activated: false,
             bandEl: null,
             additive: e.ctrlKey || e.metaKey || e.shiftKey,
-            startItem: item
+            startItem: item,
+            pointerId: e.pointerId
         };
     });
 
-    document.addEventListener('mousemove', e => {
+    document.addEventListener('pointermove', e => {
         /* ---------- 拖拽移动 ---------- */
         if (dragMoveState) {
             const state = dragMoveState;
-            dragMoveState = null;
+            const dx = e.clientX - state.startX;
+            const dy = e.clientY - state.startY;
+            if (!state.activated && Math.hypot(dx, dy) < 5) return;
 
-            if (state.ghostEl) state.ghostEl.remove();
-            if (state.hoverFolder) state.hoverFolder.classList.remove('drop-target');
-            if (state.hoverTab) state.hoverTab.classList.remove('tab-drop-target');
-            document.body.style.cursor = '';
-
-            if (state.activated) {
-                suppressClick();
-
-                if (state.hoverTab) {
-                    const targetTabId = state.hoverTab.dataset.tabId;
-                    const srcPath = [...getCurrentPath()];
-                    switchTab(targetTabId);
-                    moveItemsTo(state.items, null, targetTabId, srcPath);
-                } else if (state.hoverFolder) {
-                    const targetFolder = state.hoverFolder.dataset.name;
-                    moveItemsTo(state.items, targetFolder);
-                }
+            if (!state.activated) {
+                state.activated = true;
+                // ★ 现在才捕获指针：后续 pointer 事件稳定，click/dblclick 不受影响
+                try { list.setPointerCapture(state.pointerId); } catch (err) {}
+                const ghost = document.createElement('div');
+                ghost.className = 'drag-ghost';
+                ghost.textContent = `移动 ${state.items.length} 项`;
+                document.body.appendChild(ghost);
+                state.ghostEl = ghost;
+                document.body.style.cursor = 'grabbing';
             }
+
+            state.ghostEl.style.left = (e.clientX + 12) + 'px';
+            state.ghostEl.style.top = (e.clientY + 12) + 'px';
+
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+
+            const tabEl = under && under.closest('.tab-page[data-tab-id]');
+            let newTab = null;
+            if (tabEl && tabEl.dataset.tabId !== activeTabId) {
+                newTab = tabEl;
+            }
+
+            const folderEl = under && under.closest('.fe-item.fe-folder');
+            let newHover = null;
+            if (!newTab && folderEl) {
+                const folderName = folderEl.dataset.name;
+                const hasSelf = state.items.some(it => it.type === 'folder' && it.name === folderName);
+                if (!hasSelf) newHover = folderEl;
+            }
+
+            if (state.hoverFolder && state.hoverFolder !== newHover) {
+                state.hoverFolder.classList.remove('drop-target');
+            }
+            if (state.hoverTab && state.hoverTab !== newTab) {
+                state.hoverTab.classList.remove('tab-drop-target');
+            }
+
+            if (newHover && state.hoverFolder !== newHover) {
+                newHover.classList.add('drop-target');
+            }
+            if (newTab && state.hoverTab !== newTab) {
+                newTab.classList.add('tab-drop-target');
+            }
+
+            state.hoverFolder = newHover;
+            state.hoverTab = newTab;
             return;
         }
 
@@ -1042,6 +1268,7 @@ function initRubberBand() {
 
         if (!dragState.activated) {
             dragState.activated = true;
+            try { list.setPointerCapture(dragState.pointerId); } catch (err) {}
             const band = document.createElement('div');
             band.className = 'rubber-band';
             document.body.appendChild(band);
@@ -1073,7 +1300,9 @@ function initRubberBand() {
         });
     });
 
-    document.addEventListener('mouseup', e => {
+    document.addEventListener('pointerup', e => {
+        try { list.releasePointerCapture(e.pointerId); } catch (err) {}
+
         /* ---------- 拖拽移动收尾 ---------- */
         if (dragMoveState) {
             const state = dragMoveState;
@@ -1089,7 +1318,7 @@ function initRubberBand() {
 
                 if (state.hoverTab) {
                     const targetTabId = state.hoverTab.dataset.tabId;
-                    const srcPath = [...getCurrentPath()];   // ← 切换前抓源路径
+                    const srcPath = [...getCurrentPath()];
                     switchTab(targetTabId);
                     moveItemsTo(state.items, null, targetTabId, srcPath);
                 } else if (state.hoverFolder) {
@@ -1097,12 +1326,9 @@ function initRubberBand() {
                     moveItemsTo(state.items, targetFolder);
                 }
             } else if (state.startItem) {
-                // 未拖拽（就是单击）→ 调整选择
                 if (e.ctrlKey || e.metaKey) {
-                    // Ctrl/Cmd+单击已选中项 → 取消选中它
                     state.startItem.classList.remove('selected');
                 } else if (!e.shiftKey) {
-                    // 无修饰键 → 若多选，收缩为只选中这一项
                     const selectedCount = list.querySelectorAll('.fe-item.selected').length;
                     if (selectedCount > 1) {
                         list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));

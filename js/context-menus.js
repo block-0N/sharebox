@@ -125,6 +125,16 @@ function showContextMenu(x, y) {
 
 /* ---------- 菜单项构造 ---------- */
 
+const VIEW_MODES = [
+    { key: 'xlarge',  label: '超大图标' },
+    { key: 'large',   label: '大图标' },
+    { key: 'medium',  label: '中等图标' },
+    { key: 'small',   label: '小图标' },
+    { key: 'list',    label: '列表' },
+    { key: 'details', label: '详细信息' },
+    { key: 'tile',    label: '平铺' },
+    { key: 'content', label: '内容' }
+];
 function buildMenuItemsForFile(sel) {
     const f = findFileByStoragePath(sel.path);
     const items = [];
@@ -251,6 +261,20 @@ function buildMenuItemsForBlank() {
         items.push({ sep: true });
     }
 
+    const currentMode = getViewMode();
+    items.push({
+        label: '查看',
+        children: VIEW_MODES.map(m => ({
+            label: m.label,
+            shortcut: currentMode === m.key ? '●' : '',
+            action: () => {
+                setViewMode(m.key);
+                renderFileList();
+            }
+        }))
+    });
+
+    items.push({ sep: true });
     items.push({ label: '刷新', action: () => loadFiles() });
     return items;
 }

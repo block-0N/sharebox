@@ -18,7 +18,8 @@ function createTab(initialPath = [], view = 'quick') {
         sortKey: 'name',
         sortAsc: true,
         searchQuery: '',
-        view: view
+        view: view,
+        viewMode: 'details'
     };
     tabs.push(tab);
     return tab;

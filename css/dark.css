@@ -819,3 +819,16 @@ body.dark .prop-label {
 body.dark .prop-value {
     color: #cbd5e1;
 }
+
+/* ---------- 文件视图 深色模式 ---------- */
+body.dark .details-header {
+    background: #172033;
+    border-bottom-color: #334155;
+    color: #94a3b8;
+}
+
+body.dark .dh:hover { color: #5dade2; }
+
+body.dark .fe-tile-meta { color: #64748b; }
+
+body.dark .fe-content-line .fe-meta { color: #64748b; }
