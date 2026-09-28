@@ -8,6 +8,8 @@ initNotifyToggle();
 initTextViewer();
 initChatEvents();
 initChatInput();
+initChatToolbar();
+initShare();
 
 // 2. 标签页要在 explorer 事件之前，因为 explorer 依赖 activeTabId
 initMainTabs();

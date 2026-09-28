@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in; media-src 'self' blob: https://*.supabase.co https://*.supabase.in; frame-src https://*.supabase.co https://*.supabase.in https://view.officeapps.live.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in; media-src 'self' blob: https://*.supabase.co https://*.supabase.in; frame-src 'self' https://*.supabase.co https://*.supabase.in https://view.officeapps.live.com; object-src 'none'; base-uri 'self'; form-action 'self';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2980b9">
     <meta name="mobile-web-app-capable" content="yes">
@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="./css/viewer.css">
     <link rel="stylesheet" href="./css/dialog.css">
     <link rel="stylesheet" href="./css/menu.css">
+    <link rel="stylesheet" href="./css/share.css">
     <link rel="stylesheet" href="./css/dark.css">
     <link rel="icon" type="image/x-icon" href="./assets/icon.ico">
     <link rel="apple-touch-icon" href="./assets/icon.ico">
@@ -43,13 +44,35 @@
                     <h3>公共聊天室</h3>
                     <button class="nav-btn" id="btnChatRefresh" type="button" title="刷新">⟳</button>
                 </div>
-                <div id="msgBox"></div>
-                <div class="chat-input-row">
-                    <div class="chat-input-top">
+                <div class="chat-body">
+                    <div id="msgBox"></div>
+                    <div class="chat-input-row">
                         <input id="userName" placeholder="昵称" value="匿名用户">
-                        <button onclick="sendMsg()" type="button">发送</button>
+                        <div class="md-toolbar" id="mdToolbar">
+                            <button type="button" class="md-btn" data-md="bold" title="加粗 (Ctrl+B)"><b>B</b></button>
+                            <button type="button" class="md-btn" data-md="italic" title="斜体 (Ctrl+I)"><i>I</i></button>
+                            <button type="button" class="md-btn" data-md="strike" title="删除线"><s>S</s></button>
+                            <span class="md-sep"></span>
+                            <button type="button" class="md-btn" data-md="h" title="标题">H</button>
+                            <button type="button" class="md-btn" data-md="quote" title="引用">&gt;</button>
+                            <button type="button" class="md-btn" data-md="ul" title="无序列表">•</button>
+                            <button type="button" class="md-btn" data-md="ol" title="有序列表">1.</button>
+                            <span class="md-sep"></span>
+                            <button type="button" class="md-btn" data-md="code" title="行内代码">&lt;/&gt;</button>
+                            <button type="button" class="md-btn" data-md="codeblock" title="代码块">{ }</button>
+                            <span class="md-sep"></span>
+                            <button type="button" class="md-btn" data-md="link" title="链接 (Ctrl+K)">🔗</button>
+                            <button type="button" class="md-btn" data-md="image" title="图片">🖼️</button>
+                        </div>
+                        <div class="msg-input-wrap">
+                            <textarea id="msgInput" placeholder="输入消息（Enter 发送，Shift+Enter 换行）"></textarea>
+                            <div class="md-hint" id="mdHint"></div>
+                        </div>
+                        <div class="chat-input-actions">
+                            <button type="button" class="share-btn" id="btnShareFile" title="分享文件">📎</button>
+                            <button type="button" class="send-btn" onclick="sendMsg()">发送</button>
+                        </div>
                     </div>
-                    <textarea id="msgInput" placeholder="输入消息（Enter 发送，Shift+Enter 换行）" rows="3"></textarea>
                 </div>
             </div>
         </div>
@@ -125,7 +148,22 @@
             </div>
         </div>
     </div>
-
+    <!-- 分享文件弹窗 -->
+    <div id="shareDialog" class="dialog-overlay">
+        <div class="dialog-box share-box">
+            <div class="dialog-title">分享文件</div>
+            <div class="dialog-message">输入链接，或上传文件到网盘</div>
+            <input type="text" id="shareUrlInput" class="dialog-input" placeholder="https://... 或上传后自动填入">
+            <button type="button" id="shareUploadBtn" class="dialog-btn upload-btn">
+                📤 选择文件上传到 /文件 目录
+            </button>
+            <div id="shareUploadStatus" class="share-upload-status"></div>
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="shareCancel" type="button">取消</button>
+                <button class="dialog-btn primary" id="shareOk" type="button">分享</button>
+            </div>
+        </div>
+    </div>
     <!-- 打开方式弹窗 -->
     <div id="openWithDialog" class="dialog-overlay">
         <div class="dialog-box open-with-box">
@@ -166,6 +204,7 @@
     <script src="./js/utils.js"></script>
     <script src="./js/dialog.js"></script>
     <script src="./js/preview.js"></script>
+    <script src="./js/share.js"></script>
     <script src="./js/chat.js"></script>
     <script src="./js/upload.js"></script>
     <script src="./js/explorer.js"></script>

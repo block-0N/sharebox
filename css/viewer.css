@@ -405,3 +405,21 @@
 .md-body input[type="checkbox"] {
     margin-right: 6px;
 }
+
+/* ---------- HTML 预览 ---------- */
+.viewer-content.html-preview {
+    padding: 0;
+    overflow: hidden;
+    white-space: normal;
+    position: relative;
+}
+
+.viewer-content.html-preview iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+    display: block;
+}

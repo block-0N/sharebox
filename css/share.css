@@ -1,0 +1,140 @@
+/* ============================================================
+ * 分享文件
+ * ============================================================ */
+
+/* ---------- 聊天输入区底部按钮行 ---------- */
+.chat-input-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+}
+
+.share-btn {
+    flex: 0 0 48px;
+    margin: 0;
+    padding: 10px 0;
+    background: #eaf3fa;
+    color: #2980b9;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 8px;
+}
+
+.share-btn:hover {
+    background: #d8ebfa;
+}
+
+.chat-input-actions .send-btn {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 10px;
+}
+
+/* ---------- 分享卡片（微信风格） ---------- */
+.share-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin: 4px 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    max-width: 320px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    vertical-align: middle;
+}
+
+.share-card:hover {
+    background: #f8fbfe;
+    border-color: #2980b9;
+    box-shadow: 0 2px 10px rgba(41, 128, 185, 0.15);
+    transform: translateY(-1px);
+}
+
+.share-card:active {
+    transform: translateY(0);
+}
+
+.share-card-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+
+.share-card-icon img {
+    width: 28px;
+    height: 28px;
+    display: block;
+    object-fit: contain;
+    -webkit-user-drag: none;
+}
+
+.share-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.share-card-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.share-card-meta {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+/* ---------- 分享对话框 ---------- */
+.share-box {
+    max-width: 520px;
+}
+
+.share-box .upload-btn {
+    width: 100%;
+    margin: 0;
+    padding: 10px 16px;
+    background: #eaf3fa;
+    color: #2980b9;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+.share-box .upload-btn:hover:not(:disabled) {
+    background: #d8ebfa;
+}
+
+.share-box .upload-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.share-upload-status {
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 18px;
+    color: #64748b;
+    word-break: break-all;
+}
+
+.share-upload-status.success {
+    color: #059669;
+}
+
+.share-upload-status.error {
+    color: #dc2626;
+}

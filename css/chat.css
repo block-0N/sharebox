@@ -1,15 +1,4 @@
 /* ---------- 聊天室 ---------- */
-#msgBox {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 12px;
-    background: #fbfdff;
-}
-
 .chat-header {
     display: flex;
     align-items: center;
@@ -22,21 +11,37 @@
     color: #2c3e50;
 }
 
+/* ============================================================
+ * 聊天室主体：左侧消息列表 + 右侧输入区
+ * ============================================================ */
+.chat-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 12px;
+}
+
+#msgBox {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fbfdff;
+}
+
+/* ---------- 右侧输入区 ---------- */
 .chat-input-row {
+    flex: 0 0 340px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
 }
 
-.chat-input-top {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.chat-input-top input#userName {
-    flex: 1;
-    min-width: 0;
+.chat-input-row input#userName {
+    flex: 0 0 auto;
     margin: 0;
     padding: 9px 12px;
     border: 1px solid #cbd5e1;
@@ -50,38 +55,158 @@
     box-sizing: border-box;
 }
 
-.chat-input-top button {
-    flex-shrink: 0;
-    margin: 0;
-    padding: 9px 24px;
+.msg-input-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    display: flex;
 }
 
-.chat-input-row textarea {
+.msg-input-wrap textarea {
     width: 100%;
+    min-height: 76px;
     margin: 0;
     padding: 9px 12px;
+    padding-bottom: 32px;
+    /* 给提示条留位置 */
     border: 1px solid #cbd5e1;
     border-radius: 8px;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: 1.4;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
     outline: none;
     background: #fff;
     color: #2c3e50;
     box-sizing: border-box;
     resize: none;
     overflow-y: auto;
-    min-height: 76px;
-    max-height: 200px;
 }
 
-.chat-input-top input#userName:focus,
-.chat-input-row textarea:focus {
+.msg-input-wrap textarea:focus {
     border-color: #2980b9;
 }
 
+.md-hint {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 6px;
+    padding: 4px 8px;
+    background: rgba(41, 128, 185, 0.10);
+    border-radius: 4px;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #2980b9;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.md-hint.show {
+    opacity: 1;
+}
+
 .chat-input-row button {
+    flex: 0 0 auto;
     margin: 0;
+    padding: 10px;
+}
+
+.chat-input-row input#userName:focus {
+    border-color: #2980b9;
+}
+
+/* ---------- 小屏回退：纵向堆叠 ---------- */
+@media (max-width: 720px) {
+    .chat-body {
+        flex-direction: column;
+    }
+
+    .chat-input-row {
+        flex: 0 0 auto;
+    }
+
+    .md-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .chat-input-row textarea {
+        flex: 0 0 auto;
+        min-height: 76px;
+        max-height: 200px;
+    }
+}
+
+/* ---------- Markdown 工具栏 ---------- */
+.md-toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 1px;
+    padding: 3px 4px;
+    background: #f8fbfe;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.md-btn {
+    min-width: 22px;
+    height: 24px;
+    padding: 0 4px;
+    margin: 0;
+    background: transparent;
+    color: #64748b;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
+    flex-shrink: 0;
+}
+
+.md-btn:hover {
+    background: #eaf3fa;
+    color: #2980b9;
+}
+
+.md-btn:active {
+    background: #d8ebfa;
+}
+
+.md-btn b,
+.md-btn i,
+.md-btn s {
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 700;
+}
+
+.md-btn i {
+    font-style: italic;
+}
+
+.md-btn s {
+    text-decoration: line-through;
+    font-weight: 500;
+}
+
+.md-sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 3px 3px;
+    background: #e2e8f0;
+    flex-shrink: 0;
 }
 
 /* ---------- 消息条目 ---------- */

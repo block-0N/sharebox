@@ -80,6 +80,10 @@ function dlgPrompt(title, message, defaultValue) {
 
 /**
  * 多选项弹窗（横向按钮）
+ * @param {string} title 
+ * @param {string} message 
+ * @param {object} options 
+ * @returns 
  */
 function dlgChoose(title, message, options) {
     return new Promise(resolve => {

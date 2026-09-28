@@ -11,6 +11,7 @@ let viewerCurrentFile = null;
 function openPreview(file) {
     const name = file.displayName || file.file_name || '';
     const ext = getExt(name);
+    if (ext === 'html' || ext === 'htm') return openHtmlPreview(file);
     if (ext === 'md' || ext === 'markdown') return openMarkdownPreview(file);
     if (isZipFile(name)) return openZipViewer(file);
     if (isTextFile(name)) return openTextViewer(file);
@@ -19,7 +20,7 @@ function openPreview(file) {
     if (isVideoFile(name)) return openVideoPreview(file);
     if (isAudioFile(name)) return openAudioPreview(file);
     if (isOfficeFile(name)) return openOfficePreview(file);
-    return openUnknownFile(file);
+    return chooseOpenMethod(file);
 }
 
 /* ============================================================
@@ -351,6 +352,48 @@ async function openZipViewer(file) {
 }
 
 /* ============================================================
+ * HTML 预览
+ * ============================================================ */
+async function openHtmlPreview(file) {
+    viewerCurrentFile = file;
+    const overlay = document.getElementById('textViewer');
+    const title = document.getElementById('viewerTitle');
+    const content = document.getElementById('viewerContent');
+
+    title.textContent = file.displayName || file.file_name || 'HTML 预览';
+    content.className = 'viewer-content html-preview';
+    content.style.fontSize = '';
+    content.textContent = '加载中…';
+    overlay.classList.add('show');
+
+    try {
+        const res = await fetch(file.file_url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+
+        let html;
+        try {
+            html = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+        } catch (e) {
+            try { html = new TextDecoder('gbk', { fatal: false }).decode(buf); }
+            catch (e2) { html = new TextDecoder('utf-8', { fatal: false }).decode(buf); }
+        }
+
+        content.innerHTML = '';
+
+        const iframe = document.createElement('iframe');
+        // 不给 allow-same-origin → origin 变 null，无法访问父页面 cookie / storage
+        iframe.setAttribute('sandbox', 'allow-scripts allow-popups allow-forms allow-modals');
+        iframe.srcdoc = html;
+        content.appendChild(iframe);
+    } catch (err) {
+        console.error('HTML 预览失败', err);
+        content.className = 'viewer-content';
+        content.textContent = 'HTML 加载失败：' + err.message;
+    }
+}
+
+/* ============================================================
  * 未知类型：选择打开方式
  * ============================================================ */
 
@@ -377,6 +420,7 @@ async function chooseOpenMethod(file) {
 
     const allMethods = [
         { label: '文本查看', value: 'text', icon: '📝' },
+        { label: 'HTML 预览', value: 'html', icon: '🌐' },
         { label: 'Markdown 预览', value: 'md', icon: '📖' },
         { label: '16 进制查看', value: 'hex', icon: '🔢' },
         { label: '图片预览', value: 'image', icon: '🖼️' },
@@ -389,6 +433,7 @@ async function chooseOpenMethod(file) {
     ];
 
     const matched = [];
+    if (ext === 'html' || ext === 'htm') matched.push('html');
     if (ext === 'md' || ext === 'markdown') matched.push('md');
     if (isTextFile(name)) matched.push('text');
     if (isImageFile(name)) matched.push('image');
@@ -404,6 +449,7 @@ async function chooseOpenMethod(file) {
     if (!choice) return;
 
     if (choice === 'text') return openTextViewer(file);
+    if (choice === 'html') return openHtmlPreview(file);
     if (choice === 'md') return openMarkdownPreview(file);
     if (choice === 'hex') return openHexViewer(file);
     if (choice === 'image') return openImagePreview(file);
