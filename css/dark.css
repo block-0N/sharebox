@@ -832,3 +832,9 @@ body.dark .dh:hover { color: #5dade2; }
 body.dark .fe-tile-meta { color: #64748b; }
 
 body.dark .fe-content-line .fe-meta { color: #64748b; }
+
+/* ---------- 状态栏：选中 / 剪贴板 ---------- */
+body.dark .status-item {
+    color: #94a3b8;
+    border-left-color: #334155;
+}

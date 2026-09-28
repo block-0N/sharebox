@@ -21,6 +21,7 @@ initContextMenu();
 initKeyboardShortcuts();
 initSearch();
 initRubberBand();
+initStatusBar();
 
 // 4. 拖拽上传初始化（轮询等待 dropArea）
 initUploadMenu();

@@ -362,8 +362,9 @@
 }
 
 .progress-inner {
-    flex: 1;
-    min-width: 0;
+    flex: 0 1 300px;
+    max-width: 45%;
+    min-width: 120px;
     display: none;
     align-items: center;
     gap: 10px;
@@ -1038,3 +1039,28 @@
 #fileList[data-view="xlarge"] .fe-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 #fileList[data-view="xlarge"] .fe-grid .fe-icon img { width: 256px; height: 256px; object-fit: contain; }
 #fileList[data-view="xlarge"] .fe-grid .fe-name { font-size: 15px; -webkit-line-clamp: 3; max-height: 3.9em; }
+
+/* ============================================================
+ * 状态栏：已选中 / 已复制 / 已剪切
+ * ============================================================ */
+.status-items {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.status-item {
+    white-space: nowrap;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+    line-height: 1.2;
+}
+
+.status-item.has-border {
+    padding-left: 10px;
+    border-left: 1px solid #e2e8f0;
+}
+

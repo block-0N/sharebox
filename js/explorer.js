@@ -590,6 +590,7 @@ function renderFileList() {
             break;
     }
     wrap.scrollTop = 0;
+    if (typeof updateStatusBar === 'function') updateStatusBar();
 }
 
 /* ============================================================
@@ -1068,6 +1069,65 @@ function initExplorerEvents() {
     });
 
     refreshBtn.addEventListener("click", () => loadFiles(true));
+}
+
+/* ============================================================
+ * 状态栏：已选中 / 已复制 / 已剪切
+ * ============================================================ */
+function updateStatusBar() {
+    const selEl = document.getElementById('statusSelected');
+    const clipEl = document.getElementById('statusClipboard');
+    if (!selEl || !clipEl) return;
+
+    // 已选中
+    const sels = getSelectedItems();
+    if (sels.length > 0) {
+        selEl.textContent = `已选中 ${sels.length} 项`;
+        selEl.style.display = '';
+    } else {
+        selEl.textContent = '';
+        selEl.style.display = 'none';
+    }
+
+    // 剪贴板
+    let clipActive = false;
+    try {
+        if (typeof clipboard !== 'undefined' && clipboard && clipboard.entries && clipboard.entries.length > 0) {
+            const n = clipboard.entries.length;
+            const mode = clipboard.mode === 'cut' ? '已剪切' : '已复制';
+            clipEl.textContent = `${mode} ${n} 项`;
+            clipEl.style.display = '';
+            clipActive = true;
+        }
+    } catch (e) {}
+    if (!clipActive) {
+        clipEl.textContent = '';
+        clipEl.style.display = 'none';
+    }
+
+    // 动态分隔线：第一个可见项无左边框，其余有
+    const items = [selEl, clipEl];
+    let firstVisible = true;
+    for (const el of items) {
+        const visible = el.style.display !== 'none';
+        if (visible) {
+            el.classList.toggle('has-border', !firstVisible);
+            firstVisible = false;
+        } else {
+            el.classList.remove('has-border');
+        }
+    }
+}
+
+function initStatusBar() {
+    // 交互后延迟更新（覆盖所有点击 / 键盘 / 鼠标操作）
+    ['click', 'pointerup', 'keyup', 'input'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            setTimeout(updateStatusBar, 0);
+        }, true);
+    });
+    // 首次
+    setTimeout(updateStatusBar, 100);
 }
 
 function initSearch() {
