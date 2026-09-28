@@ -680,3 +680,22 @@
     flex: 1;
     min-width: 0;
 }
+
+/* ============================================================
+ * 快速访问 & 收藏夹
+ * ============================================================ */
+
+.quick-item .fe-name {
+    color: #2980b9;
+    font-weight: 500;
+}
+
+.quick-item:hover .fe-name {
+    color: #2471a3;
+}
+
+.fav-path {
+    width: 220px;
+    font-style: italic;
+    color: #94a3b8;
+}

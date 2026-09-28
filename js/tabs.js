@@ -10,14 +10,15 @@ let tabIdCounter = 0;
  * @param {string[]} [initialPath]
  * @returns {object} 新建的标签页对象
  */
-function createTab(initialPath = []) {
+function createTab(initialPath = [], view = 'quick') {
     const id = 'tab_' + (++tabIdCounter) + '_' + Date.now();
     const tab = {
         id,
         currentPath: [...initialPath],
         sortKey: 'name',
         sortAsc: true,
-        searchQuery: ''
+        searchQuery: '',
+        view: view
     };
     tabs.push(tab);
     return tab;
@@ -28,6 +29,9 @@ function createTab(initialPath = []) {
  */
 function getTabTitle(tab) {
     if (!tab) return '';
+    const view = tab.view || 'quick';
+    if (view === 'quick') return '快速访问';
+    if (view === 'favorites') return '收藏夹';
     if (tab.currentPath.length === 0) return '全部文件';
     return tab.currentPath[tab.currentPath.length - 1];
 }
@@ -84,8 +88,10 @@ function closeTab(id) {
  * 新建标签页并切换过去（从当前路径开始）
  */
 function createAndSwitchTab() {
-    const currentPath = getCurrentPath();
-    const tab = createTab(currentPath);
+    const current = getCurrentTab();
+    const view = current ? (current.view || 'quick') : 'quick';
+    const path = current ? [...current.currentPath] : [];
+    const tab = createTab(path, view);
     activeTabId = tab.id;
 
     const input = document.getElementById('searchInput');
@@ -251,8 +257,8 @@ function initTabShortcuts() {
  * ============================================================ */
 
 function initFolderTabs() {
-    // 创建初始标签页
-    createTab([]);
+    // 创建初始标签页：快速访问
+    createTab([], 'quick');
     activeTabId = tabs[0].id;
     renderTabBar();
     initTabDrag();

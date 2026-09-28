@@ -791,3 +791,31 @@ body.dark .share-upload-status.success {
 body.dark .share-upload-status.error {
     color: #fca5a5;
 }
+
+body.dark .quick-item .fe-name {
+    color: #5dade2;
+}
+
+body.dark .quick-item:hover .fe-name {
+    color: #7fb3d5;
+}
+
+body.dark .fav-path {
+    color: #64748b;
+}
+/* ---------- 属性对话框 ---------- */
+body.dark .prop-header {
+    border-bottom-color: #334155;
+}
+
+body.dark .prop-title {
+    color: #f1f5f9;
+}
+
+body.dark .prop-label {
+    color: #94a3b8;
+}
+
+body.dark .prop-value {
+    color: #cbd5e1;
+}

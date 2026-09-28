@@ -180,3 +180,72 @@
     font-size: 12px;
     flex-shrink: 0;
 }
+/* ============================================================
+ * 属性对话框（仿 Windows 11）
+ * ============================================================ */
+.prop-box {
+    max-width: 480px;
+}
+
+.prop-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.prop-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prop-icon img {
+    width: 40px;
+    height: 40px;
+    display: block;
+    object-fit: contain;
+    -webkit-user-drag: none;
+}
+
+.prop-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.prop-table {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.prop-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    align-items: start;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.prop-label {
+    color: #64748b;
+    user-select: none;
+}
+
+.prop-value {
+    color: #1e293b;
+    word-break: break-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

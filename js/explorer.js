@@ -22,6 +22,16 @@ function setCurrentPath(path) {
     if (t) t.currentPath = path;
 }
 
+function getView() {
+    const t = getCurrentTab();
+    return t ? (t.view || 'quick') : 'quick';
+}
+
+function setView(v) {
+    const t = getCurrentTab();
+    if (t) t.view = v;
+}
+
 function getSort() {
     const t = getCurrentTab();
     return t ? { key: t.sortKey, asc: t.sortAsc } : { key: 'name', asc: true };
@@ -193,6 +203,9 @@ async function loadFiles(preserveScroll = false) {
     storageMeta = metaMap;
     fileTree = buildTree(listRes.data || []);
 
+    // 加载收藏
+    await loadFavorites();
+
     // 所有标签页：路径失效的回到根目录
     for (const t of tabs) {
         if (!getNodeByPath(t.currentPath)) t.currentPath = [];
@@ -253,26 +266,36 @@ function renderBreadcrumb() {
     const upBtn = document.getElementById("btnUp");
     if (!bar) return;
 
+    const view = getView();
     const currentPath = getCurrentPath();
-    let html = `<span class="crumb ${currentPath.length === 0 ? 'current' : ''}" data-idx="-1">🏠 全部文件</span>`;
-    currentPath.forEach((seg, i) => {
-        const isLast = i === currentPath.length - 1;
-        html += `<span class="crumb-sep">›</span>`;
-        html += `<span class="crumb ${isLast ? 'current' : ''}" data-idx="${i}">${escapeHtml(seg)}</span>`;
-    });
+
+    let html = '';
+    html += `<span class="crumb ${view === 'quick' ? 'current' : ''}" data-crumb="home">🏠 快速访问</span>`;
+
+    if (view === 'favorites') {
+        html += `<span class="crumb-sep">|</span>`;
+        html += `<span class="crumb current">⭐收藏夹</span>`;
+    } else if (view === 'path') {
+        html += `<span class="crumb-sep">|</span>`;
+        const isRoot = currentPath.length === 0;
+        html += `<span class="crumb ${isRoot ? 'current' : ''}" data-crumb="root">📁 全部文件</span>`;
+        currentPath.forEach((seg, i) => {
+            const isLast = i === currentPath.length - 1;
+            html += `<span class="crumb-sep">›</span>`;
+            html += `<span class="crumb ${isLast ? 'current' : ''}" data-idx="${i}">${escapeHtml(seg)}</span>`;
+        });
+    }
     bar.innerHTML = html;
 
-    if (upBtn) upBtn.disabled = currentPath.length === 0;
+    if (upBtn) upBtn.disabled = (view === 'quick');
     bar.scrollLeft = bar.scrollWidth;
 }
+
 /**
  * Supabase Storage 免费套餐容量（1 GB）
  */
 const STORAGE_QUOTA = 1024 * 1024 * 1024;
 
-/**
- * 更新底部容量显示
- */
 function updateStorageInfo() {
     const el = document.getElementById('storageInfo');
     if (!el) return;
@@ -478,6 +501,10 @@ function renderFileList() {
         return;
     }
 
+    const view = getView();
+    if (view === 'quick') { renderQuickAccess(wrap); return; }
+    if (view === 'favorites') { renderFavorites(wrap); return; }
+
     const currentPath = getCurrentPath();
     const node = getNodeByPath(currentPath);
     if (!node) {
@@ -652,24 +679,22 @@ function initExplorerEvents() {
     const upBtn = document.getElementById("btnUp");
     const refreshBtn = document.getElementById("btnRefresh");
 
-    // 单击：触发操作按钮
     list.addEventListener("click", e => {
         if (isClickSuppressed()) return;
 
         const btn = e.target.closest("button[data-action]");
-        const item = e.target.closest(".fe-item");
-        if (!item) return;
-
         if (btn) {
             e.stopPropagation();
+            const item = e.target.closest(".fe-item");
+            if (!item) return;
             const action = btn.dataset.action;
             const name = item.dataset.name;
             const currentPath = getCurrentPath();
 
             if (action === "open-folder") {
-                const currentPath = getCurrentPath();
-                currentPath.push(name);
-                setCurrentPath(currentPath);
+                const cp = getCurrentPath();
+                cp.push(name);
+                setCurrentPath(cp);
                 renderExplorer();
                 updateActiveTabTitle();
             } else if (action === "zip") {
@@ -688,11 +713,30 @@ function initExplorerEvents() {
             return;
         }
 
-        // ★ 单击"已选中项"的文件名 → 延时进入内联重命名
+        const quick = e.target.closest('[data-quick]');
+        if (quick) {
+            if (!quick.classList.contains('selected')) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                quick.classList.add('selected');
+            }
+            return;
+        }
+
+        const favItem = e.target.closest('.fav-item');
+        if (favItem) {
+            if (!favItem.classList.contains('selected')) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                favItem.classList.add('selected');
+            }
+            return;
+        }
+
+        const item = e.target.closest('.fe-item');
+        if (!item) return;
+
         const nameEl = e.target.closest('.fe-name');
         if (nameEl && !inlineRenameActive) {
             const sels = getSelectedItems();
-            // 三重判定：mousedown 时该项已选中 + 就是这一项 + click 后仍唯一选中
             if (lastMousedownSoleSelected &&
                 lastMousedownItemEl === item &&
                 sels.length === 1 &&
@@ -706,19 +750,42 @@ function initExplorerEvents() {
         }
     });
 
-    // 双击：进入文件夹 / 打开文件
     list.addEventListener("dblclick", e => {
         if (isClickSuppressed()) return;
-        if (inlineRenameTimer) {                    // ★ 双击要打开，取消待进入的编辑
+        if (inlineRenameTimer) {
             clearTimeout(inlineRenameTimer);
             inlineRenameTimer = null;
         }
+
+        const quick = e.target.closest('[data-quick]');
+        if (quick) {
+            const type = quick.dataset.quick;
+            if (type === 'favorites') setView('favorites');
+            else if (type === 'all') { setView('path'); setCurrentPath([]); }
+            else if (type === 'shared') { setView('path'); setCurrentPath(['文件']); }
+
+            if (getSearchQuery()) {
+                setSearchQuery('');
+                const si = document.getElementById('searchInput');
+                if (si) si.value = '';
+            }
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
+
+        const favItem = e.target.closest('.fav-item');
+        if (favItem) {
+            openFavoriteItem(favItem);
+            return;
+        }
+
         const item = e.target.closest(".fe-item");
         if (!item) return;
         if (item.dataset.type === "folder") {
-            const currentPath = getCurrentPath();
-            currentPath.push(item.dataset.name);
-            setCurrentPath(currentPath);
+            const cp = getCurrentPath();
+            cp.push(item.dataset.name);
+            setCurrentPath(cp);
             renderExplorer();
             updateActiveTabTitle();
             return;
@@ -728,35 +795,71 @@ function initExplorerEvents() {
         openPreview(file);
     });
 
-    // 面包屑点击
     bar.addEventListener("click", e => {
         const crumb = e.target.closest(".crumb");
+        const view = getView();
 
-        // 点空白 → 进入编辑
         if (!crumb) {
-            setTimeout(() => enterBreadcrumbEdit(), 0);
+            if (view === 'path') setTimeout(() => enterBreadcrumbEdit(), 0);
             return;
         }
 
-        // 点路径段 → 跳转
+        if (crumb.classList.contains('current')) return;
+
+        const clearSearch = () => {
+            if (getSearchQuery()) {
+                setSearchQuery('');
+                const input = document.getElementById('searchInput');
+                if (input) input.value = '';
+                const clearBtn = document.getElementById('searchClear');
+                if (clearBtn) clearBtn.classList.remove('show');
+            }
+        };
+
+        if (crumb.dataset.crumb === 'home') {
+            setView('quick');
+            clearSearch();
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
+
+        if (crumb.dataset.crumb === 'root') {
+            setView('path');
+            setCurrentPath([]);
+            clearSearch();
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
+
         const idx = parseInt(crumb.dataset.idx, 10);
+        if (isNaN(idx)) return;
         const currentPath = getCurrentPath();
         setCurrentPath(currentPath.slice(0, idx + 1));
-
-        // 清空搜索
-        if (getSearchQuery()) {
-            setSearchQuery('');
-            const input = document.getElementById('searchInput');
-            if (input) input.value = '';
-        }
+        clearSearch();
         renderExplorer();
         updateActiveTabTitle();
     });
 
-    // 上一级
     upBtn.addEventListener("click", () => {
+        const view = getView();
+        if (view === 'quick') return;
+
+        if (view === 'favorites') {
+            setView('quick');
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
+
         const currentPath = getCurrentPath();
-        if (currentPath.length === 0) return;
+        if (currentPath.length === 0) {
+            setView('quick');
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
         currentPath.pop();
         setCurrentPath(currentPath);
 
@@ -769,13 +872,8 @@ function initExplorerEvents() {
         updateActiveTabTitle();
     });
 
-    // 刷新
     refreshBtn.addEventListener("click", () => loadFiles(true));
 }
-
-/* ============================================================
- * 搜索
- * ============================================================ */
 
 function initSearch() {
     const input = document.getElementById('searchInput');
@@ -841,13 +939,18 @@ function isClickSuppressed() {
  */
 function getSelectedItems() {
     const els = document.querySelectorAll('#fileList .fe-item.selected');
-    return Array.from(els).map(el => ({
-        type: el.dataset.type,
-        name: el.dataset.name,
-        id: el.dataset.id,
-        path: el.dataset.path,
-        el
-    }));
+    return Array.from(els)
+        .filter(el => {
+            const t = el.dataset.type;
+            return t === 'file' || t === 'folder';
+        })
+        .map(el => ({
+            type: el.dataset.type,
+            name: el.dataset.name,
+            id: el.dataset.id,
+            path: el.dataset.path,
+            el
+        }));
 }
 
 function getSelectedItem() {
@@ -864,6 +967,8 @@ function initRubberBand() {
         if (e.target.closest('button')) return;
         if (e.target.closest('#contextMenu')) return;
         if (e.target.closest('.context-submenu')) return;
+        // ★ 快速访问/收藏夹项不参与框选和拖拽
+        if (e.target.closest('.quick-item') || e.target.closest('.fav-item')) return;
 
         const item = e.target.closest('.fe-item');
 
