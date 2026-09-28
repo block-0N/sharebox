@@ -249,3 +249,152 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ============================================================
+ * 自定义图标对话框
+ * ============================================================ */
+.custom-icons-box {
+    max-width: 560px;
+}
+
+.custom-icons-box .dialog-message code {
+    font-family: Consolas, "Cascadia Code", monospace;
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #2980b9;
+}
+
+.custom-icons-box .icon-dir-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #f8fbfe;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.custom-icons-box .icon-dir-row code {
+    flex: 1;
+    min-width: 0;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 12px;
+    color: #475569;
+    word-break: break-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: text;
+}
+
+.custom-icons-box .icon-dir-row button {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    background: #eaf3fa;
+    color: #2980b9;
+}
+
+.custom-icons-box .icon-dir-row button:hover {
+    background: #d8ebfa;
+}
+
+.custom-icons-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px;
+    min-height: 80px;
+    background: #fbfdff;
+}
+
+.custom-icons-empty {
+    padding: 30px 12px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.custom-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.custom-icon-row:hover {
+    background: #eef6fc;
+}
+
+.custom-icon-ext {
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+    color: #2980b9;
+    min-width: 70px;
+    font-weight: 500;
+}
+
+.custom-icon-preview {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.custom-icon-preview img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    display: block;
+}
+
+.custom-icon-row .dialog-btn.del {
+    padding: 4px 12px;
+    font-size: 12px;
+}
+
+/* 深色模式 */
+body.dark .custom-icons-box .dialog-message code {
+    background: #263449;
+    color: #5dade2;
+}
+
+body.dark .custom-icons-box .icon-dir-row {
+    background: #172033;
+    border-color: #334155;
+}
+
+body.dark .custom-icons-box .icon-dir-row code {
+    color: #94a3b8;
+}
+
+body.dark .custom-icons-box .icon-dir-row button {
+    background: #1e3a5f;
+    color: #5dade2;
+}
+
+body.dark .custom-icons-box .icon-dir-row button:hover {
+    background: #2a4a72;
+}
+
+body.dark .custom-icons-list {
+    background: #111827;
+    border-color: #334155;
+}
+
+body.dark .custom-icon-row:hover {
+    background: #263449;
+}
+
+body.dark .custom-icon-ext {
+    color: #5dade2;
+}
+
+body.dark .custom-icons-empty {
+    color: #64748b;
+}

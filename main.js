@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, session, Notification, dialog } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, session, Notification, dialog, ipcMain, shell } = require('electron');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -105,6 +105,7 @@ async function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: true,
+            preload: path.join(__dirname, 'preload.js'),
         },
     });
 
@@ -140,6 +141,139 @@ async function createWindow() {
             }
             event.preventDefault();
         }
+    });
+}
+/* ============================================================
+ * 自定义图标（仅 Electron）
+ * ============================================================ */
+let iconsWatcher = null;
+let iconsWatchTimer = null;
+
+function getIconsDir() {
+    const dir = path.join(app.getPath('userData'), 'custom-icons');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+function iconMimeOf(file) {
+    const ext = path.extname(file).toLowerCase();
+    if (ext === '.svg') return 'image/svg+xml';
+    if (ext === '.png') return 'image/png';
+    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+    if (ext === '.gif') return 'image/gif';
+    if (ext === '.webp') return 'image/webp';
+    if (ext === '.ico') return 'image/x-icon';
+    if (ext === '.bmp') return 'image/bmp';
+    return null;
+}
+
+function scanCustomIcons() {
+    const dir = getIconsDir();
+    const files = fs.readdirSync(dir);
+    const result = [];
+    for (const f of files) {
+        const imgExt = path.extname(f);
+        const mime = iconMimeOf(f);
+        if (!mime) continue;
+        const base = path.basename(f, imgExt);
+        const ext = base.replace(/^\./, '').toLowerCase();
+        if (!ext) continue;
+        try {
+            const buf = fs.readFileSync(path.join(dir, f));
+            const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+            result.push({ ext, fileName: f, dataUrl });
+        } catch (e) {
+            console.warn('读取图标失败', f, e.message);
+        }
+    }
+    return result;
+}
+
+async function broadcastCustomIcons() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const icons = scanCustomIcons();
+    mainWindow.webContents.send('custom-icons:changed', icons);
+}
+
+function startIconsWatch() {
+    if (iconsWatcher) return;
+    const dir = getIconsDir();
+    try {
+        iconsWatcher = fs.watch(dir, { persistent: true }, () => {
+            if (iconsWatchTimer) clearTimeout(iconsWatchTimer);
+            iconsWatchTimer = setTimeout(() => {
+                iconsWatchTimer = null;
+                broadcastCustomIcons();
+            }, 300);
+        });
+    } catch (e) {
+        console.warn('fs.watch 启动失败', e.message);
+    }
+}
+
+function initCustomIcons() {
+    getIconsDir();
+    startIconsWatch();
+
+    ipcMain.handle('custom-icons:list', () => scanCustomIcons());
+    ipcMain.handle('custom-icons:getDir', () => getIconsDir());
+
+    ipcMain.handle('custom-icons:openFolder', async () => {
+        await shell.openPath(getIconsDir());
+        return { success: true };
+    });
+
+    ipcMain.handle('custom-icons:pick', async () => {
+        const res = await dialog.showOpenDialog(mainWindow, {
+            title: '选择图标文件',
+            filters: [
+                { name: '图片', extensions: ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'] },
+                { name: '所有文件', extensions: ['*'] }
+            ],
+            properties: ['openFile']
+        });
+        if (res.canceled || !res.filePaths.length) return null;
+        const filePath = res.filePaths[0];
+        return { filePath, fileName: path.basename(filePath) };
+    });
+
+    ipcMain.handle('custom-icons:add', async (e, { srcPath, ext }) => {
+        if (!srcPath || !ext) throw new Error('参数缺失');
+        const cleanExt = String(ext).trim().toLowerCase().replace(/^\./, '');
+        if (!cleanExt) throw new Error('扩展名不能为空');
+        if (!/^[a-z0-9_\-]+$/.test(cleanExt)) throw new Error('扩展名只能包含字母、数字、_ 和 -');
+
+        const srcExt = path.extname(srcPath).toLowerCase();
+        if (!iconMimeOf('x' + srcExt)) throw new Error('不支持的图片格式');
+
+        const dir = getIconsDir();
+        for (const f of fs.readdirSync(dir)) {
+            const base = path.basename(f, path.extname(f)).replace(/^\./, '').toLowerCase();
+            if (base === cleanExt) fs.unlinkSync(path.join(dir, f));
+        }
+        const dst = path.join(dir, `${cleanExt}${srcExt}`);
+        fs.copyFileSync(srcPath, dst);
+        return { success: true, fileName: path.basename(dst) };
+    });
+
+    ipcMain.handle('custom-icons:delete', async (e, ext) => {
+        if (!ext) throw new Error('参数缺失');
+        const cleanExt = String(ext).trim().toLowerCase().replace(/^\./, '');
+        const dir = getIconsDir();
+        let removed = 0;
+        for (const f of fs.readdirSync(dir)) {
+            const base = path.basename(f, path.extname(f)).replace(/^\./, '').toLowerCase();
+            if (base === cleanExt) {
+                fs.unlinkSync(path.join(dir, f));
+                removed++;
+            }
+        }
+        return { success: true, removed };
+    });
+
+    ipcMain.handle('custom-icons:reload', async () => {
+        await broadcastCustomIcons();
+        return { success: true };
     });
 }
 function createTray() {
@@ -194,6 +328,7 @@ app.whenReady().then(() => {
     buildMenu();
     createWindow();
     createTray();
+    initCustomIcons();
 });
 
 app.on('window-all-closed', () => {
@@ -202,6 +337,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     isQuitting = true;
+    if (iconsWatcher) {
+        try { iconsWatcher.close(); } catch (e) {}
+        iconsWatcher = null;
+    }
 });
 
 app.on('activate', () => {

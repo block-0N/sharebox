@@ -658,8 +658,15 @@ function detectLang(filename) {
 function getFileIconUrl(filename) {
     const name = String(filename || '').toLowerCase();
     const idx = name.lastIndexOf('.');
-    if (idx === -1 || idx === 0) return DEFAULT_FILE_ICON;
-    const ext = name.slice(idx + 1);
+    const ext = (idx === -1 || idx === 0) ? '' : name.slice(idx + 1);
+
+    // 1. 自定义图标优先（仅 Electron 环境注入）
+    if (ext && window.__CUSTOM_ICONS__ && window.__CUSTOM_ICONS__[ext]) {
+        return window.__CUSTOM_ICONS__[ext];
+    }
+
+    // 2. 默认映射
+    if (!ext) return DEFAULT_FILE_ICON;
     const file = FILE_ICON_SVG_MAP[ext];
     return file ? VSC_ICON_CDN + file : DEFAULT_FILE_ICON;
 }

@@ -25,6 +25,7 @@
     <div class="top-bar">
         <h2>ShareBox</h2>
         <div class="top-actions">
+            <button id="btnCustomIcons" class="theme-toggle" type="button" style="display:none">🎨 图标</button>
             <button id="notifyToggle" class="theme-toggle" type="button">🔔 通知</button>
             <button id="themeToggle" class="theme-toggle" type="button">🌙 深色</button>
         </div>
@@ -193,6 +194,23 @@
         </div>
     </div>
 
+    <!-- 自定义图标对话框 -->
+    <div id="customIconsDialog" class="dialog-overlay">
+        <div class="dialog-box custom-icons-box">
+            <div class="dialog-title">自定义图标</div>
+            <div class="dialog-message">图标文件放在用户数据目录，按扩展名命名（如 <code>psd.svg</code> 映射到 .psd）</div>
+            <div class="icon-dir-row">
+                <code id="iconDirPath">加载中…</code>
+                <button class="dialog-btn" id="btnOpenIconDir" type="button">打开目录</button>
+            </div>
+            <div class="custom-icons-list" id="customIconsList"></div>
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="btnReloadIcons" type="button">重载</button>
+                <button class="dialog-btn" id="btnAddIcon" type="button">+ 添加图标</button>
+                <button class="dialog-btn primary" id="btnCloseIcons" type="button">关闭</button>
+            </div>
+        </div>
+    </div>
     <!-- 文本查看器 -->
     <div id="textViewer" class="viewer-overlay">
         <div class="viewer-box">
@@ -230,6 +248,7 @@
     <script src="./js/actions.js"></script>
     <script src="./js/context-menus.js"></script>
     <script src="./js/tabs.js"></script>
+    <script src="./js/custom-icons.js"></script>
     <script src="./js/main.js"></script>
 </body>
 
