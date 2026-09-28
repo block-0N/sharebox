@@ -62,6 +62,50 @@ function fileNameFromUrl(url) {
     }
 }
 
+/**
+ * 解析分享文件名：优先查 file_list 表，查不到才从 URL 猜
+ * @param {string} url
+ * @returns {Promise<string>}
+ */
+async function resolveShareFileName(url) {
+    if (!url) return '分享文件';
+
+    // 1. 精确匹配 file_url
+    try {
+        const { data } = await sb.from('file_list')
+            .select('file_name')
+            .eq('file_url', url)
+            .limit(1);
+        if (data && data[0] && data[0].file_name) {
+            const full = data[0].file_name;
+            return full.split('/').pop() || full;
+        }
+    } catch (e) {
+        // 忽略，走兜底
+    }
+
+    // 2. 模糊匹配 storage_path（用户可能把完整 URL 里带参数或不完全一致）
+    try {
+        const m = url.match(/\/public\/public_netdisk\/([^?#]+)/);
+        if (m) {
+            const storagePath = decodeURIComponent(m[1]);
+            const { data } = await sb.from('file_list')
+                .select('file_name')
+                .eq('storage_path', storagePath)
+                .limit(1);
+            if (data && data[0] && data[0].file_name) {
+                const full = data[0].file_name;
+                return full.split('/').pop() || full;
+            }
+        }
+    } catch (e) {
+        // 忽略
+    }
+
+    // 3. 兜底：从 URL 猜
+    return fileNameFromUrl(url);
+}
+
 /** 上传文件到 /文件 目录，返回 { url, name, size } */
 async function uploadShareFile() {
     if (!window.showOpenFilePicker) {
@@ -117,17 +161,29 @@ function openShareDialog() {
         };
         const finish = (v) => { cleanup(); resolve(v); };
 
-        const onOk = () => {
+        const onOk = async () => {
             const url = urlInput.value.trim();
             if (!url) {
                 if (typeof dlgAlert === 'function') dlgAlert('提示', '请输入链接或先上传文件');
                 return;
             }
-            // 如果 URL 就是刚上传得到的，用已知信息；否则从 URL 猜
+
+            // 刚上传的文件：直接用它已知的真实名字
             if (uploaded && uploaded.url === url) {
                 finish({ url, name: uploaded.name, size: uploaded.size });
-            } else {
-                finish({ url, name: fileNameFromUrl(url) });
+                return;
+            }
+
+            // 用户粘贴的链接：查网盘表拿真实文件名，查不到才从 URL 猜
+            okBtn.disabled = true;
+            const origText = okBtn.textContent;
+            okBtn.textContent = '解析中…';
+            try {
+                const name = await resolveShareFileName(url);
+                finish({ url, name });
+            } finally {
+                okBtn.disabled = false;
+                okBtn.textContent = origText;
             }
         };
 
@@ -170,8 +226,7 @@ function openShareDialog() {
 
 async function handleShareCardClick(data) {
     if (!data || !data.url) return;
-    const fallbackName = fileNameFromUrl(data.url);
-    const displayName = data.name || fallbackName;
+    const displayName = data.name || await resolveShareFileName(data.url);
 
     const choice = await dlgChoose(
         '分享文件',
