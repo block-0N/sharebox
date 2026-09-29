@@ -591,6 +591,7 @@ function renderFileList() {
     }
     wrap.scrollTop = 0;
     if (typeof updateStatusBar === 'function') updateStatusBar();
+    if (typeof initGridLazyLoad === 'function') initGridLazyLoad();
 }
 
 /* ============================================================
@@ -605,6 +606,11 @@ function getGridIconUrl(name, url, viewMode) {
 }
 
 function renderItemGrid(folders, files, sizeClass) {
+    const isRemote = (u) => u && /supabase\.co/i.test(u);
+    const imgTag = (u) => isRemote(u)
+        ? `<img src="${DEFAULT_FILE_ICON}" data-src="${escapeHtml(u)}" alt="">`
+        : `<img src="${escapeHtml(u)}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'">`;
+
     let html = `<div class="fe-grid">`;
     for (const f of folders) {
         html += `
@@ -621,8 +627,7 @@ function renderItemGrid(folders, files, sizeClass) {
              data-name="${escapeHtml(fi.displayName)}"
              data-id="${escapeHtml(fi.id)}"
              data-path="${escapeHtml(fi.storage_path)}">
-            <span class="fe-icon"><img src="${iconUrl}" alt=""
-                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <span class="fe-icon">${imgTag(iconUrl)}</span>
             <span class="fe-name" title="${escapeHtml(fi.displayName)}">${escapeHtml(fi.displayName)}</span>
         </div>`;
     }
@@ -631,6 +636,11 @@ function renderItemGrid(folders, files, sizeClass) {
 }
 
 function renderItemTile(folders, files) {
+    const isRemote = (u) => u && /supabase\.co/i.test(u);
+    const imgTag = (u) => isRemote(u)
+        ? `<img src="${DEFAULT_FILE_ICON}" data-src="${escapeHtml(u)}" alt="">`
+        : `<img src="${escapeHtml(u)}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'">`;
+
     let html = `<div class="fe-tile-wrap">`;
     for (const f of folders) {
         html += `
@@ -650,8 +660,7 @@ function renderItemTile(folders, files) {
              data-name="${escapeHtml(fi.displayName)}"
              data-id="${escapeHtml(fi.id)}"
              data-path="${escapeHtml(fi.storage_path)}">
-            <span class="fe-icon"><img src="${iconUrl}" alt=""
-                onerror="this.onerror=null;this.src='${DEFAULT_FILE_ICON}'"></span>
+            <span class="fe-icon">${imgTag(iconUrl)}</span>
             <div class="fe-tile-info">
                 <div class="fe-name" title="${escapeHtml(fi.displayName)}">${escapeHtml(fi.displayName)}</div>
                 <div class="fe-tile-meta">${escapeHtml(getFileTypeLabel(fi.displayName))} · ${formatBytes(fi._size || 0)}</div>

@@ -423,3 +423,12 @@
     background: #fff;
     display: block;
 }
+/* 图片预览加载中占位 */
+.viewer-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #94a3b8;
+    font-size: 14px;
+}

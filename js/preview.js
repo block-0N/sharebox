@@ -196,9 +196,22 @@ async function openMarkdownPreview(file) {
  * 图片 / PDF / 视频 / 音频 / Office
  * ============================================================ */
 
-function openImagePreview(file) {
+async function openImagePreview(file) {
     const content = resetViewer(file);
-    content.innerHTML = `<img class="viewer-image" src="${file.file_url}" alt="">`;
+    const currentURL = file.file_url;
+    content.innerHTML = `<div class="viewer-loading">正在加载图片…</div>`;
+
+    let displayURL = currentURL;
+    try {
+        if (window.mediaCache) {
+            displayURL = await window.mediaCache.fetch(currentURL);
+        }
+    } catch (e) {
+        console.warn('图片缓存失败，降级用原 URL', e);
+    }
+
+    if (viewerCurrentFile !== file) return;
+    content.innerHTML = `<img class="viewer-image" src="${displayURL}" alt="">`;
 }
 
 function openPdfPreview(file) {
