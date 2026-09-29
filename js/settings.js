@@ -1,5 +1,5 @@
 /* ============================================================
- * 设置面板 + 系统右键菜单
+ * 设置面板（含 Windows 右键菜单 + 自定义图标）
  * ============================================================ */
 (function () {
     if (typeof window.shareboxAPI === 'undefined') return;
@@ -65,9 +65,14 @@
         if (!overlay) return;
         overlay.classList.add('show');
         await updateCtxUI();
+        if (window.shareboxCustomIcons) {
+            await window.shareboxCustomIcons.initDir();
+            await window.shareboxCustomIcons.refresh();
+        }
     }
 
     function closeSettings() {
+        if (window.shareboxCustomIcons) window.shareboxCustomIcons.reset();
         const overlay = document.getElementById('settingsDialog');
         if (overlay) overlay.classList.remove('show');
     }
@@ -92,7 +97,6 @@
             const basePath = typeof getCurrentPath === 'function' ? getCurrentPath() : [];
             const targetPath = buildFullPath(basePath, res.name);
 
-            // 走 doUploadItems：自动处理同名冲突（覆盖 / 保留两者）
             await doUploadItems([{ file, path: targetPath }], false);
         } catch (e) {
             await dlgAlert('上传失败', e.message || String(e));
@@ -101,9 +105,12 @@
 
     function init() {
         const settingsBtn = document.getElementById('btnSettings');
-        if (settingsBtn && window.shareboxAPI.contextMenu) {
-            settingsBtn.style.display = '';
-            settingsBtn.addEventListener('click', openSettings);
+        if (settingsBtn) {
+            // 有主进程支持才显示按钮
+            if (window.shareboxAPI.contextMenu || window.shareboxAPI.icons) {
+                settingsBtn.style.display = '';
+                settingsBtn.addEventListener('click', openSettings);
+            }
         }
 
         const closeBtn = document.getElementById('btnCloseSettings');

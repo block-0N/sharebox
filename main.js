@@ -496,6 +496,7 @@ app.whenReady().then(() => {
     createTray();
     initCustomIcons();
     initContextMenuIPC();
+    initIconsDirIPC();
 });
 
 app.on('window-all-closed', () => {
@@ -517,3 +518,100 @@ app.on('activate', () => {
         mainWindow.show();
     }
 });
+
+
+/* ============================================================
+ * settings.json 支持（追加，覆盖前面的 getIconsDir）
+ * ============================================================ */
+function getSettingsPath() {
+    return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function loadSettings() {
+    try {
+        const p = getSettingsPath();
+        if (!fs.existsSync(p)) return {};
+        return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+    } catch (e) {
+        console.warn('读取 settings.json 失败:', e.message);
+        return {};
+    }
+}
+
+function saveSettings(obj) {
+    const p = getSettingsPath();
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(obj, null, 2), 'utf8');
+}
+
+function getDefaultIconsDir() {
+    return path.join(app.getPath('userData'), 'custom-icons');
+}
+
+// 覆盖原 getIconsDir：优先读 settings.json
+function getIconsDir() {
+    const settings = loadSettings();
+    const dir = settings.iconsDir || getDefaultIconsDir();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+function initIconsDirIPC() {
+    ipcMain.handle('custom-icons:pickDir', async () => {
+        const res = await dialog.showOpenDialog(mainWindow, {
+            title: '选择自定义图标目录',
+            properties: ['openDirectory', 'createDirectory']
+        });
+        if (res.canceled || !res.filePaths.length) return null;
+        return res.filePaths[0];
+    });
+
+    ipcMain.handle('custom-icons:setDir', async (e, newDir) => {
+        if (!newDir || typeof newDir !== 'string') throw new Error('参数缺失');
+        if (!path.isAbsolute(newDir)) throw new Error('需要绝对路径');
+
+        const oldDir = getIconsDir();
+        const newDirAbs = path.resolve(newDir);
+
+        if (oldDir === newDirAbs) {
+            return { success: true, message: '目录未变化', migrated: 0, skipped: 0 };
+        }
+
+        if (!fs.existsSync(newDirAbs)) fs.mkdirSync(newDirAbs, { recursive: true });
+
+        // 迁移：复制旧目录里的所有图标文件（同名跳过）
+        let migrated = 0, skipped = 0;
+        try {
+            if (fs.existsSync(oldDir)) {
+                for (const f of fs.readdirSync(oldDir)) {
+                    if (!iconMimeOf(f)) continue;
+                    const src = path.join(oldDir, f);
+                    const dst = path.join(newDirAbs, f);
+                    if (fs.existsSync(dst)) { skipped++; continue; }
+                    try { fs.copyFileSync(src, dst); migrated++; }
+                    catch (err) { console.warn('迁移失败', f, err.message); }
+                }
+            }
+        } catch (err) {
+            console.warn('迁移异常', err.message);
+        }
+
+        // 保存 settings
+        const settings = loadSettings();
+        settings.iconsDir = newDirAbs;
+        saveSettings(settings);
+
+        // 重启 watcher
+        if (iconsWatcher) {
+            try { iconsWatcher.close(); } catch (err) {}
+            iconsWatcher = null;
+        }
+        startIconsWatch();
+
+        // 广播新图标列表
+        await broadcastCustomIcons();
+
+        return { success: true, migrated, skipped, dir: newDirAbs };
+    });
+}

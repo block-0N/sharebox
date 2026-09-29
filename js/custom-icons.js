@@ -30,7 +30,7 @@
         try {
             const list = await window.shareboxAPI.icons.list();
             if (!list.length) {
-                el.innerHTML = '<div class="custom-icons-empty">还没有自定义图标，点击右下角「+ 添加图标」开始</div>';
+                el.innerHTML = '<div class="custom-icons-empty">还没有自定义图标，点击下方「+ 添加图标」开始</div>';
                 return;
             }
             el.innerHTML = list.map(it => `
@@ -175,39 +175,46 @@
         }
     }
 
-    async function openIconDialog() {
-        const overlay = document.getElementById('customIconsDialog');
-        if (!overlay) return;
-        hideAddForm();
-        overlay.classList.add('show');
-        await updateDirPath();
-        await refreshDialogList();
-    }
+    async function changeIconDir() {
+        try {
+            const newDir = await window.shareboxAPI.icons.pickDir();
+            if (!newDir) return;
 
-    function closeIconDialog() {
-        hideAddForm();
-        const overlay = document.getElementById('customIconsDialog');
-        if (overlay) overlay.classList.remove('show');
+            const ok = await dlgConfirm(
+                '更改图标目录',
+                `确定将图标目录更改为：\n\n${newDir}\n\n旧目录里的图标会自动复制到新目录（同名跳过）。`,
+                false
+            );
+            if (!ok) return;
+
+            showToast('正在迁移图标…', 'info', 1500);
+
+            const res = await window.shareboxAPI.icons.setDir(newDir);
+            if (res && res.success) {
+                showToast(
+                    `已切换，迁移 ${res.migrated} 个图标` + (res.skipped ? `，跳过 ${res.skipped} 个同名` : ''),
+                    'success',
+                    3000
+                );
+                await updateDirPath();
+                await refreshDialogList();
+            } else {
+                await dlgAlert('切换失败', (res && res.message) || '未知错误');
+            }
+        } catch (e) {
+            await dlgAlert('切换失败', e.message || String(e));
+        }
     }
 
     function init() {
-        const btn = document.getElementById('btnCustomIcons');
-        if (btn) {
-            btn.style.display = '';
-            btn.addEventListener('click', openIconDialog);
-        }
-
         window.shareboxAPI.icons.list().then(applyIcons).catch(e => console.warn('加载自定义图标失败', e));
 
         window.shareboxAPI.icons.onChanged(list => {
             applyIcons(list);
             if (typeof showToast === 'function') showToast('自定义图标已更新', 'info', 1500);
-            const ov = document.getElementById('customIconsDialog');
+            const ov = document.getElementById('settingsDialog');
             if (ov && ov.classList.contains('show')) refreshDialogList();
         });
-
-        const closeBtn = document.getElementById('btnCloseIcons');
-        if (closeBtn) closeBtn.addEventListener('click', closeIconDialog);
 
         const addBtn = document.getElementById('btnAddIcon');
         if (addBtn) addBtn.addEventListener('click', showAddForm);
@@ -217,6 +224,10 @@
 
         const openDirBtn = document.getElementById('btnOpenIconDir');
         if (openDirBtn) openDirBtn.addEventListener('click', openIconFolder);
+
+
+        const changeDirBtn = document.getElementById('btnChangeIconDir');
+        if (changeDirBtn) changeDirBtn.addEventListener('click', changeIconDir);
 
         const pickBtn = document.getElementById('btnPickIconFile');
         if (pickBtn) pickBtn.addEventListener('click', pickIconFile);
@@ -240,26 +251,11 @@
             });
         }
 
-        const overlay = document.getElementById('customIconsDialog');
-        if (overlay) {
-            overlay.addEventListener('click', e => {
-                if (e.target === overlay) closeIconDialog();
-            });
-        }
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                const ov = document.getElementById('customIconsDialog');
-                if (ov && ov.classList.contains('show')) {
-                    const form = document.getElementById('iconAddForm');
-                    if (form && form.classList.contains('show')) {
-                        hideAddForm();
-                    } else {
-                        closeIconDialog();
-                    }
-                }
-            }
-        });
+        window.shareboxCustomIcons = {
+            refresh: refreshDialogList,
+            reset: hideAddForm,
+            initDir: updateDirPath
+        };
     }
 
     if (document.readyState === 'loading') {
