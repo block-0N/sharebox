@@ -246,3 +246,56 @@ function initMainTabs() {
         });
     });
 }
+
+/* ============================================================
+ * 链接拦截：Supabase 文件链接 → 应用内跳转
+ * （普通外链交给主进程 shell.openExternal / 浏览器默认行为）
+ * ============================================================ */
+function initLinkInterceptor() {
+    document.addEventListener('click', e => {
+        const a = e.target.closest('a[href]');
+        if (!a) return;
+
+        const href = a.getAttribute('href') || '';
+        if (!href) return;
+
+        // 只处理 Supabase Storage public URL
+        const m = href.match(/\/storage\/v1\/object\/public\/([^/]+)\/([^?#]+)/);
+        if (!m) return;
+
+        const storagePath = decodeURIComponent(m[2]);
+
+        // 查文件树
+        const file = findFileByStoragePath(storagePath);
+        if (!file) return; // 找不到记录 → 放行（走下载）
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 先切到"公共网盘"主 tab
+        const netdiskTab = document.querySelector('.tab[data-tab="netdisk"]');
+        if (netdiskTab && !netdiskTab.classList.contains('active')) {
+            netdiskTab.click();
+        }
+
+        // 从 file_name 反推所在目录
+        const parts = file.file_name.split('/').filter(Boolean);
+        parts.pop();
+        setView('path');
+        setCurrentPath(parts);
+        renderExplorer();
+        updateActiveTabTitle();
+
+        // 高亮该文件
+        setTimeout(() => {
+            const list = document.getElementById('fileList');
+            if (!list) return;
+            const target = list.querySelector(`.fe-item.fe-file[data-path="${CSS.escape(storagePath)}"]`);
+            if (target) {
+                list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+                target.classList.add('selected');
+                target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        }, 100);
+    }, true);
+}

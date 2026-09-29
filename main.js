@@ -110,6 +110,24 @@ async function createWindow() {
     });
 
     mainWindow.loadURL(`http://127.0.0.1:${PORT}/index.html`);
+    // 外部链接用系统浏览器打开
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith(`http://127.0.0.1:${PORT}`)) {
+            return { action: 'allow' };
+        }
+        if (/^https?:\/\//i.test(url)) {
+            shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
+
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (url.startsWith(`http://127.0.0.1:${PORT}`)) return;
+        if (/^https?:\/\//i.test(url)) {
+            event.preventDefault();
+            shell.openExternal(url);
+        }
+    });
 
     // 关闭时最小化到托盘，不退出
     mainWindow.on('close', (e) => {
