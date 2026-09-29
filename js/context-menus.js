@@ -143,6 +143,15 @@ function buildMenuItemsForFile(sel) {
     items.push({ label: '属性', action: () => showPropertiesForFile(sel) });
     items.push({ sep: true });
     items.push({ label: '下载', action: () => { if (f) downloadFile(f.displayName, f.file_url); } });
+    items.push({
+        label: '复制分享链接',
+        action: async () => {
+            if (!f || !f.file_url) { await dlgAlert('无法复制', '该文件没有可用的分享链接'); return; }
+            const ok = await copyToClipboard(f.file_url);
+            if (ok) showToast('分享链接已复制', 'success');
+            else await dlgAlert('复制失败', '无法写入剪贴板');
+        }
+    });
     items.push({ label: '复制', shortcut: 'Ctrl+C', action: () => copySelection(false) });
     items.push({ label: '剪切', shortcut: 'Ctrl+X', action: () => copySelection(true) });
     items.push({ label: '重命名', shortcut: 'F2', action: renameSelected });
@@ -667,4 +676,37 @@ function initContextMenu() {
     });
     document.addEventListener('scroll', hideContextMenu, true);
     window.addEventListener('resize', hideContextMenu);
+}
+
+
+/* ============================================================
+ * 剪贴板工具：navigator.clipboard 失败时用 execCommand 兜底
+ * ============================================================ */
+async function copyToClipboard(text) {
+    if (!text) return false;
+
+    try {
+        if (navigator.clipboard && document.hasFocus()) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (e) {}
+
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.top = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch (e) {
+        console.warn('execCommand copy 失败', e);
+        return false;
+    }
 }

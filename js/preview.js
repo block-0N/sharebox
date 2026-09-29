@@ -57,7 +57,8 @@ function initTextViewer() {
         const btn = document.getElementById('viewerCopy');
         const content = document.getElementById('viewerContent').textContent;
         try {
-            await navigator.clipboard.writeText(content);
+            const ok = await copyToClipboard(content);
+            if (!ok) throw new Error('剪贴板写入失败');
             const old = btn.textContent;
             btn.textContent = '已复制';
             setTimeout(() => { btn.textContent = old; }, 1000);
@@ -74,7 +75,8 @@ function initTextViewer() {
             return;
         }
         try {
-            await navigator.clipboard.writeText(url);
+            const ok = await copyToClipboard(url);
+            if (!ok) throw new Error('剪贴板写入失败');
             const btn = document.getElementById('viewerShare');
             const old = btn.textContent;
             btn.textContent = '✓ 已复制';
