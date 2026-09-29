@@ -8,6 +8,9 @@
 
     window.__CUSTOM_ICONS__ = {};
 
+    let pickedFilePath = null;
+    let pickedFileName = null;
+
     function applyIcons(list) {
         const map = {};
         for (const it of (list || [])) {
@@ -27,7 +30,7 @@
         try {
             const list = await window.shareboxAPI.icons.list();
             if (!list.length) {
-                el.innerHTML = '<div class="custom-icons-empty">还没有自定义图标</div>';
+                el.innerHTML = '<div class="custom-icons-empty">还没有自定义图标，点击右下角「+ 添加图标」开始</div>';
                 return;
             }
             el.innerHTML = list.map(it => `
@@ -57,42 +60,85 @@
         }
     }
 
-    async function openIconDialog() {
-        const overlay = document.getElementById('customIconsDialog');
-        if (!overlay) return;
-        overlay.classList.add('show');
-        await updateDirPath();
-        await refreshDialogList();
+    function showAddForm() {
+        const form = document.getElementById('iconAddForm');
+        if (!form) return;
+
+        pickedFilePath = null;
+        pickedFileName = null;
+
+        const nameEl = document.getElementById('iconAddFileName');
+        if (nameEl) {
+            nameEl.textContent = '未选择';
+            nameEl.classList.remove('has-file');
+        }
+        const extInput = document.getElementById('iconAddExt');
+        if (extInput) extInput.value = '';
+
+        form.classList.add('show');
+        const pickBtn = document.getElementById('btnPickIconFile');
+        if (pickBtn) pickBtn.focus();
     }
 
-    function closeIconDialog() {
-        const overlay = document.getElementById('customIconsDialog');
-        if (overlay) overlay.classList.remove('show');
+    function hideAddForm() {
+        const form = document.getElementById('iconAddForm');
+        if (form) form.classList.remove('show');
+        pickedFilePath = null;
+        pickedFileName = null;
     }
 
-    function guessExt(fileName) {
-        const m = String(fileName || '').match(/^([^.]+)\./);
-        return m ? m[1].toLowerCase() : '';
-    }
-
-    async function addIcon() {
+    async function pickIconFile() {
         try {
             const picked = await window.shareboxAPI.icons.pick();
             if (!picked) return;
-            const suggested = guessExt(picked.fileName) || '';
-            const input = await dlgPrompt(
-                '关联扩展名',
-                `为「${picked.fileName}」指定要替换的扩展名（不含点）`,
-                suggested
-            );
-            if (input === null) return;
-            const cleanExt = String(input).trim().toLowerCase().replace(/^\./, '');
-            if (!cleanExt) {
-                await dlgAlert('提示', '扩展名不能为空');
-                return;
+
+            pickedFilePath = picked.filePath;
+            pickedFileName = picked.fileName;
+
+            const nameEl = document.getElementById('iconAddFileName');
+            if (nameEl) {
+                nameEl.textContent = picked.fileName;
+                nameEl.classList.add('has-file');
+                nameEl.title = picked.filePath;
             }
-            await window.shareboxAPI.icons.add(picked.filePath, cleanExt);
+
+            const extInput = document.getElementById('iconAddExt');
+            if (extInput && !extInput.value) {
+                const m = String(picked.fileName).match(/^([^.]+)\./);
+                if (m) extInput.value = m[1].toLowerCase();
+            }
+            if (extInput) {
+                extInput.focus();
+                extInput.select();
+            }
+        } catch (e) {
+            await dlgAlert('选择文件失败', e.message || String(e));
+        }
+    }
+
+    async function confirmAddIcon() {
+        if (!pickedFilePath) {
+            await dlgAlert('提示', '请先选择图标文件');
+            return;
+        }
+        const extInput = document.getElementById('iconAddExt');
+        const cleanExt = String(extInput ? extInput.value : '').trim().toLowerCase().replace(/^\./, '');
+
+        if (!cleanExt) {
+            await dlgAlert('提示', '请填写关联的扩展名');
+            if (extInput) extInput.focus();
+            return;
+        }
+        if (!/^[a-z0-9_\-]+$/.test(cleanExt)) {
+            await dlgAlert('提示', '扩展名只能包含字母、数字、下划线和横杠');
+            if (extInput) extInput.focus();
+            return;
+        }
+
+        try {
+            await window.shareboxAPI.icons.add(pickedFilePath, cleanExt);
             showToast(`已添加 .${cleanExt} 图标`, 'success');
+            hideAddForm();
             await refreshDialogList();
         } catch (e) {
             await dlgAlert('添加失败', e.message || String(e));
@@ -129,6 +175,21 @@
         }
     }
 
+    async function openIconDialog() {
+        const overlay = document.getElementById('customIconsDialog');
+        if (!overlay) return;
+        hideAddForm();
+        overlay.classList.add('show');
+        await updateDirPath();
+        await refreshDialogList();
+    }
+
+    function closeIconDialog() {
+        hideAddForm();
+        const overlay = document.getElementById('customIconsDialog');
+        if (overlay) overlay.classList.remove('show');
+    }
+
     function init() {
         const btn = document.getElementById('btnCustomIcons');
         if (btn) {
@@ -149,7 +210,7 @@
         if (closeBtn) closeBtn.addEventListener('click', closeIconDialog);
 
         const addBtn = document.getElementById('btnAddIcon');
-        if (addBtn) addBtn.addEventListener('click', addIcon);
+        if (addBtn) addBtn.addEventListener('click', showAddForm);
 
         const reloadBtn = document.getElementById('btnReloadIcons');
         if (reloadBtn) reloadBtn.addEventListener('click', reloadIcons);
@@ -157,16 +218,46 @@
         const openDirBtn = document.getElementById('btnOpenIconDir');
         if (openDirBtn) openDirBtn.addEventListener('click', openIconFolder);
 
+        const pickBtn = document.getElementById('btnPickIconFile');
+        if (pickBtn) pickBtn.addEventListener('click', pickIconFile);
+
+        const cancelAddBtn = document.getElementById('btnCancelAddIcon');
+        if (cancelAddBtn) cancelAddBtn.addEventListener('click', hideAddForm);
+
+        const confirmAddBtn = document.getElementById('btnConfirmAddIcon');
+        if (confirmAddBtn) confirmAddBtn.addEventListener('click', confirmAddIcon);
+
+        const extInput = document.getElementById('iconAddExt');
+        if (extInput) {
+            extInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    confirmAddIcon();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideAddForm();
+                }
+            });
+        }
+
         const overlay = document.getElementById('customIconsDialog');
         if (overlay) {
             overlay.addEventListener('click', e => {
                 if (e.target === overlay) closeIconDialog();
             });
         }
+
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 const ov = document.getElementById('customIconsDialog');
-                if (ov && ov.classList.contains('show')) closeIconDialog();
+                if (ov && ov.classList.contains('show')) {
+                    const form = document.getElementById('iconAddForm');
+                    if (form && form.classList.contains('show')) {
+                        hideAddForm();
+                    } else {
+                        closeIconDialog();
+                    }
+                }
             }
         });
     }

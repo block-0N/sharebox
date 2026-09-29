@@ -398,3 +398,153 @@ body.dark .custom-icon-ext {
 body.dark .custom-icons-empty {
     color: #64748b;
 }
+
+/* ============================================================
+ * 自定义图标 - 内联添加表单
+ * ============================================================ */
+.icon-add-form {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    margin: 4px 0;
+}
+
+.icon-add-form.show {
+    display: flex;
+    animation: slideDown 0.18s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.icon-add-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon-add-label {
+    flex-shrink: 0;
+    width: 82px;
+    font-size: 13px;
+    color: #475569;
+    user-select: none;
+}
+
+.icon-add-row .dialog-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.icon-add-file {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #94a3b8;
+    font-family: Consolas, "Cascadia Code", monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.icon-add-file.has-file {
+    color: #0284c7;
+}
+
+.icon-add-ext-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0 10px;
+    transition: border-color 0.15s;
+}
+
+.icon-add-ext-wrap:focus-within {
+    border-color: #2980b9;
+}
+
+.icon-add-ext-prefix {
+    color: #94a3b8;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+    user-select: none;
+}
+
+.icon-add-ext-input {
+    flex: 1;
+    border: none !important;
+    outline: none !important;
+    padding: 6px 0 !important;
+    margin: 0 !important;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+    color: #0f172a;
+    background: transparent !important;
+    min-width: 0;
+    border-radius: 0 !important;
+}
+
+.icon-add-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.icon-add-actions .dialog-btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    margin: 0;
+}
+/* ---------- 自定义图标：深色模式 ---------- */
+body.dark .icon-add-form {
+    background: #0c2233;
+    border-color: #1e4976;
+}
+
+body.dark .icon-add-label {
+    color: #94a3b8;
+}
+
+body.dark .icon-add-file {
+    color: #64748b;
+}
+
+body.dark .icon-add-file.has-file {
+    color: #5dade2;
+}
+
+body.dark .icon-add-ext-wrap {
+    background: #172033;
+    border-color: #475569;
+}
+
+body.dark .icon-add-ext-wrap:focus-within {
+    border-color: #5dade2;
+}
+
+body.dark .icon-add-ext-input {
+    color: #e2e8f0;
+}
+
+body.dark .icon-add-ext-prefix {
+    color: #64748b;
+}
+/* ============================================================
+ * 通用弹窗 #dialog 需要盖在 #customIconsDialog 之上
+ * 场景：设置图标面板打开时，点删除按钮弹出的 dlgConfirm
+ * ============================================================ */
+#dialog {
+    z-index: 3100;
+}

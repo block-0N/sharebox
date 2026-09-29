@@ -198,19 +198,41 @@
     <div id="customIconsDialog" class="dialog-overlay">
         <div class="dialog-box custom-icons-box">
             <div class="dialog-title">自定义图标</div>
-            <div class="dialog-message">图标文件放在用户数据目录，按扩展名命名（如 <code>psd.svg</code> 映射到 .psd）</div>
+
             <div class="icon-dir-row">
                 <code id="iconDirPath">加载中…</code>
                 <button class="dialog-btn" id="btnOpenIconDir" type="button">打开目录</button>
-            </div>
-            <div class="custom-icons-list" id="customIconsList"></div>
-            <div class="dialog-actions">
                 <button class="dialog-btn" id="btnReloadIcons" type="button">重载</button>
-                <button class="dialog-btn" id="btnAddIcon" type="button">+ 添加图标</button>
-                <button class="dialog-btn primary" id="btnCloseIcons" type="button">关闭</button>
+            </div>
+
+            <div class="icon-add-form" id="iconAddForm">
+                <div class="icon-add-row">
+                    <span class="icon-add-label">图标文件</span>
+                    <button class="dialog-btn" id="btnPickIconFile" type="button">选择文件…</button>
+                    <span class="icon-add-file" id="iconAddFileName">未选择</span>
+                </div>
+                <div class="icon-add-row">
+                    <span class="icon-add-label">关联扩展名</span>
+                    <span class="icon-add-ext-wrap">
+                        <span class="icon-add-ext-prefix">.</span>
+                        <input type="text" id="iconAddExt" class="icon-add-ext-input" placeholder="psd" autocomplete="off" spellcheck="false">
+                    </span>
+                </div>
+                <div class="icon-add-actions">
+                    <button class="dialog-btn" id="btnCancelAddIcon" type="button">取消</button>
+                    <button class="dialog-btn primary" id="btnConfirmAddIcon" type="button">确认添加</button>
+                </div>
+            </div>
+
+            <div class="custom-icons-list" id="customIconsList"></div>
+
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="btnCloseIcons" type="button">关闭</button>
+                <button class="dialog-btn primary" id="btnAddIcon" type="button">+ 添加图标</button>
             </div>
         </div>
     </div>
+
     <!-- 文本查看器 -->
     <div id="textViewer" class="viewer-overlay">
         <div class="viewer-box">
