@@ -26,6 +26,7 @@
         <h2>ShareBox</h2>
         <div class="top-actions">
             <button id="btnCustomIcons" class="theme-toggle" type="button" style="display:none">🎨 图标</button>
+            <button id="btnSettings" class="theme-toggle" type="button" style="display:none">⚙ 设置</button>
             <button id="notifyToggle" class="theme-toggle" type="button">🔔 通知</button>
             <button id="themeToggle" class="theme-toggle" type="button">🌙 深色</button>
         </div>
@@ -194,7 +195,29 @@
         </div>
     </div>
 
-    <!-- 自定义图标对话框 -->
+    <!-- 设置对话框 -->
+    <div id="settingsDialog" class="dialog-overlay">
+        <div class="dialog-box settings-box">
+            <div class="dialog-title">设置</div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">Windows 右键菜单</div>
+                <div class="settings-section-desc">
+                    在资源管理器里右键文件或文件夹时，添加「上传到 ShareBox」菜单项。
+                </div>
+                <div class="settings-section-row">
+                    <span class="settings-status" id="ctxStatus">检测中…</span>
+                    <button class="dialog-btn primary" id="btnToggleCtx" type="button" disabled>加载中</button>
+                </div>
+            </div>
+
+            <div class="dialog-actions">
+                <button class="dialog-btn" id="btnCloseSettings" type="button">关闭</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- 自定义图标对话框 -->
     <div id="customIconsDialog" class="dialog-overlay">
         <div class="dialog-box custom-icons-box">
             <div class="dialog-title">自定义图标</div>
@@ -271,6 +294,7 @@
     <script src="./js/context-menus.js"></script>
     <script src="./js/tabs.js"></script>
     <script src="./js/custom-icons.js"></script>
+    <script src="./js/settings.js"></script>
     <script src="./js/main.js"></script>
 </body>
 

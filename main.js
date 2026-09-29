@@ -18,6 +18,113 @@ const MIME = {
     '.ico': 'image/x-icon',
 };
 
+/* ============================================================
+ * 单实例锁 + 命令行参数
+ * ============================================================ */
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    process.exit(0);
+}
+
+function parseUploadArg(argv) {
+    const idx = argv.indexOf('--upload');
+    if (idx < 0) return null;
+    for (let i = argv.length - 1; i > idx; i--) {
+        let p = String(argv[i] || '');
+        if (p.startsWith('-')) continue;
+        if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
+        p = p.trim();
+        if (p.startsWith('"') && p.endsWith('"')) p = p.slice(1, -1);
+        if (path.isAbsolute(p)) return p;
+    }
+    return null;
+}
+
+app.on('second-instance', (event, commandLine) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    console.log('[second-instance] argv:', JSON.stringify(commandLine));
+    const uploadPath = parseUploadArg(commandLine);
+    console.log('[second-instance] uploadPath:', JSON.stringify(uploadPath));
+    if (uploadPath) {
+        mainWindow.webContents.send('context-menu:upload-request', uploadPath);
+    }
+});
+
+/* ============================================================
+ * 系统右键菜单注册
+ * ============================================================ */
+const REG_ROOT = 'HKEY_CURRENT_USER\\Software\\Classes';
+const CTX_MENU_LABEL = '上传到 ShareBox';
+const CTX_MENU_KEY = 'ShareBox';
+
+function regAdd(key, valueName, valueData) {
+    const { spawnSync } = require('child_process');
+    const args = ['add', key, '/f'];
+    if (valueName) args.push('/v', valueName);
+    else args.push('/ve');
+    args.push('/d', valueData);
+    const r = spawnSync('reg', args, { encoding: 'utf8', windowsHide: true });
+    return r.status === 0;
+}
+
+function regDelete(key) {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync('reg', ['delete', key, '/f'], { encoding: 'utf8', windowsHide: true });
+    return r.status === 0;
+}
+
+function getExeCommand() {
+    if (app.isPackaged) {
+        return `"${process.execPath}"`;
+    }
+    return `"${process.execPath}" "${app.getAppPath()}"`;
+}
+
+function getExeIcon() {
+    if (app.isPackaged) {
+        return `"${process.execPath}",0`;
+    }
+    const ico = path.join(__dirname, 'assets', 'icon.ico');
+    if (fs.existsSync(ico)) return `"${ico}"`;
+    return '';
+}
+
+function isContextMenuRegistered() {
+    if (process.platform !== 'win32') return false;
+    const { spawnSync } = require('child_process');
+    const r = spawnSync('reg', ['query', `${REG_ROOT}\\*\\shell\\${CTX_MENU_KEY}`], { encoding: 'utf8', windowsHide: true });
+    return r.status === 0;
+}
+
+function registerContextMenu() {
+    if (process.platform !== 'win32') throw new Error('仅 Windows 支持');
+    const cmd = `${getExeCommand()} --upload %1`;
+    const icon = getExeIcon();
+    const targets = [
+        `${REG_ROOT}\\*\\shell\\${CTX_MENU_KEY}`,
+        `${REG_ROOT}\\Directory\\shell\\${CTX_MENU_KEY}`
+    ];
+    for (const key of targets) {
+        regAdd(key, '', CTX_MENU_LABEL);
+        if (icon) regAdd(key, 'Icon', icon);
+        regAdd(key + '\\command', '', cmd);
+    }
+    return true;
+}
+
+function unregisterContextMenu() {
+    if (process.platform !== 'win32') throw new Error('仅 Windows 支持');
+    const targets = [
+        `${REG_ROOT}\\*\\shell\\${CTX_MENU_KEY}`,
+        `${REG_ROOT}\\Directory\\shell\\${CTX_MENU_KEY}`
+    ];
+    for (const key of targets) regDelete(key);
+    return true;
+}
+
 function startServer() {
     return new Promise((resolve) => {
         const server = http.createServer((req, res) => {
@@ -107,6 +214,17 @@ async function createWindow() {
             webSecurity: true,
             preload: path.join(__dirname, 'preload.js'),
         },
+    });
+
+    mainWindow.webContents.once('did-finish-load', () => {
+        const initialUpload = parseUploadArg(process.argv);
+        if (initialUpload) {
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('context-menu:upload-request', initialUpload);
+                }
+            }, 800);
+        }
     });
 
     mainWindow.loadURL(`http://127.0.0.1:${PORT}/index.html`);
@@ -229,6 +347,36 @@ function startIconsWatch() {
     }
 }
 
+/* ============================================================
+ * 右键菜单 IPC
+ * ============================================================ */
+function initContextMenuIPC() {
+    ipcMain.handle('context-menu:isRegistered', () => isContextMenuRegistered());
+    ipcMain.handle('context-menu:register', () => {
+        try {
+            registerContextMenu();
+            return { success: true, registered: isContextMenuRegistered() };
+        } catch (e) {
+            return { success: false, message: e.message };
+        }
+    });
+    ipcMain.handle('context-menu:unregister', () => {
+        try {
+            unregisterContextMenu();
+            return { success: true, registered: isContextMenuRegistered() };
+        } catch (e) {
+            return { success: false, message: e.message };
+        }
+    });
+    ipcMain.handle('context-menu:readFile', (e, filePath) => {
+        if (!path.isAbsolute(filePath)) throw new Error('需要绝对路径');
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) throw new Error('不是文件');
+        if (stat.size > 500 * 1024 * 1024) throw new Error('文件过大（>500MB）');
+        const buf = fs.readFileSync(filePath);
+        return { name: path.basename(filePath), size: stat.size, buffer: buf };
+    });
+}
 function initCustomIcons() {
     getIconsDir();
     startIconsWatch();
@@ -347,6 +495,7 @@ app.whenReady().then(() => {
     createWindow();
     createTray();
     initCustomIcons();
+    initContextMenuIPC();
 });
 
 app.on('window-all-closed', () => {
