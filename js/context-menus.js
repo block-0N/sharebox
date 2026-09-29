@@ -386,7 +386,8 @@ async function copyFavoritePath(favEl) {
     const favPath = favEl.dataset.favPath;
     const full = '/' + favPath.split('/').filter(Boolean).join('/');
     try {
-        await navigator.clipboard.writeText(full);
+        const ok = await copyToClipboard(full);
+        if (!ok) throw new Error('剪贴板写入失败');
         showToast('路径已复制', 'success');
     } catch (e) {
         showToast('复制失败', 'error');

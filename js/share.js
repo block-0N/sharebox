@@ -253,7 +253,8 @@ async function handleShareCardClick(data) {
         downloadFile(displayName, data.url);
     } else if (choice === 'copy') {
         try {
-            await navigator.clipboard.writeText(data.url);
+            const ok = await copyToClipboard(data.url);
+            if (!ok) throw new Error('剪贴板写入失败');
             showToast('分享链接已复制', 'success');
         } catch (e) {
             showToast('复制失败', 'error');
