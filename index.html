@@ -210,6 +210,31 @@
             </div>
 
             <div class="settings-section">
+                <div class="settings-section-title">数据存储</div>
+                <div class="settings-section-desc">
+                    数据目录包含 settings.json、custom-icons、缓存等。
+                    更改后旧数据会自动复制到新目录（同名跳过）。<strong>需要重启应用生效。</strong>
+                </div>
+
+                <div class="settings-path-row">
+                    <span class="settings-path-label">数据目录</span>
+                    <code class="settings-path-value" id="dataDirValue">加载中…</code>
+                    <button class="dialog-btn" id="btnChangeDataDir" type="button">更改</button>
+                </div>
+
+                <div class="settings-path-row">
+                    <span class="settings-path-label">缓存目录</span>
+                    <code class="settings-path-value" id="cacheDirValue">加载中…</code>
+                    <button class="dialog-btn" id="btnChangeCacheDir" type="button">更改</button>
+                </div>
+
+                <div class="settings-section-row">
+                    <span></span>
+                    <button class="dialog-btn danger" id="btnResetDefaults" type="button">恢复默认路径</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <div class="settings-section-title">自定义图标</div>
                 <div class="settings-section-desc">
                     图标文件按扩展名命名（如 <code>psd.svg</code> 映射到 .psd），放在用户数据目录。

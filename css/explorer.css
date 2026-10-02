@@ -1064,3 +1064,13 @@
     border-left: 1px solid #e2e8f0;
 }
 
+
+
+/* ---------- 详细信息表头：icon 占位列 + 修改日期右对齐 ---------- */
+.details-header .dh-icon {
+    width: 28px;
+    flex-shrink: 0;
+}
+.details-header .dh-mtime {
+    text-align: right;
+}

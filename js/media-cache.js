@@ -7,7 +7,7 @@
     const STORE = 'media';
     const MAX_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
     const MAX_ENTRIES = 2000;
-    const MEM_CACHE_MAX = 80;
+    const MEM_CACHE_MAX = 200;
 
     let dbPromise = null;
     const memCache = new Map();
@@ -163,7 +163,23 @@
         }
     }
 
-    window.mediaCache = { get, put, fetch: fetchCached, clear: clearAll, stats };
+    function getSync(url) {
+    return memCache.get(url) || null;
+}
+
+async function warmup(url) {
+    if (!url) return;
+    if (memCache.has(url)) return;
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        await put(url, blob);
+    } catch (e) {
+        console.warn('[warmup] 失败', url, e.message);
+    }
+}
+window.mediaCache = { get, put, getSync, warmup, fetch: fetchCached, clear: clearAll, stats };
 
 /* ============================================================
  * 网格视图懒加载

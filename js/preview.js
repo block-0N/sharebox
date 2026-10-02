@@ -199,19 +199,38 @@ async function openMarkdownPreview(file) {
 async function openImagePreview(file) {
     const content = resetViewer(file);
     const currentURL = file.file_url;
-    content.innerHTML = `<div class="viewer-loading">正在加载图片…</div>`;
 
-    let displayURL = currentURL;
-    try {
-        if (window.mediaCache) {
-            displayURL = await window.mediaCache.fetch(currentURL);
+    // 1. 同步命中内存缓存 → 立刻渲染（毫秒级）
+    if (window.mediaCache && window.mediaCache.getSync) {
+        const cached = window.mediaCache.getSync(currentURL);
+        if (cached) {
+            content.innerHTML = `<img class="viewer-image" src="${cached}" alt="">`;
+            return;
         }
-    } catch (e) {
-        console.warn('图片缓存失败，降级用原 URL', e);
     }
 
-    if (viewerCurrentFile !== file) return;
-    content.innerHTML = `<img class="viewer-image" src="${displayURL}" alt="">`;
+    // 2. 未命中 → 直接用原 URL 渲染，浏览器会流式显示（边下边看）
+    content.innerHTML = `
+        <div class="viewer-img-wrap">
+            <img class="viewer-image" src="${currentURL}" alt="">
+            <div class="viewer-loading-tip" id="viewerLoadingTip">正在加载图片…</div>
+        </div>`;
+    const img = content.querySelector('img');
+    const tip = content.querySelector('.viewer-loading-tip');
+
+    const hideTip = () => { if (tip && tip.parentNode) tip.remove(); };
+    img.addEventListener('load', hideTip);
+    img.addEventListener('error', hideTip);
+
+    // 3. 后台缓存 + 缓存完成后换 objectURL（避免再次请求）
+    if (window.mediaCache && window.mediaCache.warmup) {
+        window.mediaCache.warmup(currentURL).then(() => {
+            const cached = window.mediaCache.getSync(currentURL);
+            if (cached && viewerCurrentFile === file && img.isConnected) {
+                img.src = cached;
+            }
+        }).catch(() => {});
+    }
 }
 
 function openPdfPreview(file) {

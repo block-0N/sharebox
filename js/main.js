@@ -23,6 +23,8 @@ initSearch();
 initRubberBand();
 initStatusBar();
 initLinkInterceptor();
+initKeyboardNavigation();
+initCtrlWheelZoom();
 
 // 4. 拖拽上传初始化（轮询等待 dropArea）
 initUploadMenu();

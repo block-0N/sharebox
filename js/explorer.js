@@ -513,7 +513,7 @@ function renderFileList() {
 
     const view = getView();
     if (view === 'quick') { wrap.dataset.view = 'details'; renderQuickAccess(wrap); return; }
-    if (view === 'favorites') { wrap.dataset.view = 'details'; renderFavorites(wrap); return; }
+    if (view === 'favorites') { wrap.dataset.view = getViewMode(); renderFavorites(wrap); return; }
 
     const currentPath = getCurrentPath();
     const node = getNodeByPath(currentPath);
@@ -701,6 +701,7 @@ function renderDetailsHeader() {
     const arrow = (k) => key === k ? (asc ? ' ↑' : ' ↓') : '';
     return `
     <div class="details-header">
+        <div class="dh dh-icon"></div>
         <div class="dh dh-name" data-col="name">名称${arrow('name')}</div>
         <div class="dh dh-type" data-col="type">类型${arrow('type')}</div>
         <div class="dh dh-size" data-col="size">大小${arrow('size')}</div>
@@ -1560,4 +1561,115 @@ async function moveItemsTo(items, targetFolder, targetTabId, sourcePathOverride)
 
     showToast(`已移动 ${items.length} 项`, 'success');
     loadFiles();
+}
+
+
+/* ============================================================
+ * 方向键导航 + 空格预览
+ * ============================================================ */
+function initKeyboardNavigation() {
+    document.addEventListener('keydown', e => {
+        if (e.target.matches('input, textarea, [contenteditable="true"]')) return;
+
+        // 预览打开时：空格关预览
+        if (document.querySelector('#textViewer.show')) {
+            if (e.key === ' ') {
+                e.preventDefault();
+                closeTextViewer();
+            }
+            return;
+        }
+        if (document.querySelector('#dialog.show')) return;
+        if (document.querySelector('#settingsDialog.show')) return;
+        if (document.querySelector('#newFileDialog.show')) return;
+        if (document.querySelector('#openWithDialog.show')) return;
+
+        const list = document.getElementById('fileList');
+        if (!list) return;
+        const items = Array.from(list.querySelectorAll('.fe-item'));
+        if (!items.length) return;
+
+        // 空格：预览当前选中文件
+        if (e.key === ' ') {
+            // 收藏夹项：文件可预览，文件夹无预览
+            const _favEl = list.querySelector('.fav-item.selected');
+            if (_favEl) {
+                if (_favEl.dataset.favType === 'file') {
+                    const storage = _favEl.dataset.storagePath;
+                    const f = storage ? findFileByStoragePath(storage) : null;
+                    if (f) { e.preventDefault(); openPreview(f); }
+                }
+                return;
+            }
+            // 快速访问项：无预览
+            if (list.querySelector('.quick-item.selected')) return;
+
+            // 普通文件/文件夹
+            const sel = list.querySelector('.fe-item.selected');
+            if (!sel) return;
+            if (sel.dataset.type === 'folder') return;
+            const file = findFileByStoragePath(sel.dataset.path);
+            if (!file) return;
+            e.preventDefault();
+            openPreview(file);
+            return;
+        }
+
+        const arrows = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (!arrows.includes(e.key)) return;
+        e.preventDefault();
+
+        let idx = items.findIndex(el => el.classList.contains('selected'));
+        if (idx < 0) idx = 0;
+
+        // 网格视图按列数跳
+        let cols = 1;
+        const viewMode = getViewMode();
+        if (['small', 'medium', 'large', 'xlarge', 'tile'].includes(viewMode)) {
+            const firstTop = items[0].getBoundingClientRect().top;
+            cols = 0;
+            for (let i = 0; i < items.length; i++) {
+                if (Math.abs(items[i].getBoundingClientRect().top - firstTop) < 2) cols++;
+                else break;
+            }
+            if (cols < 1) cols = 1;
+        }
+
+        let next = idx;
+        if (e.key === 'ArrowDown') next = Math.min(idx + cols, items.length - 1);
+        else if (e.key === 'ArrowUp') next = Math.max(idx - cols, 0);
+        else if (e.key === 'ArrowRight') next = Math.min(idx + 1, items.length - 1);
+        else if (e.key === 'ArrowLeft') next = Math.max(idx - 1, 0);
+
+        if (next === idx && items[idx].classList.contains('selected')) return;
+
+        list.querySelectorAll('.fe-item.selected').forEach(el => el.classList.remove('selected'));
+        items[next].classList.add('selected');
+        items[next].scrollIntoView({ block: 'nearest' });
+
+        if (typeof updateStatusBar === 'function') updateStatusBar();
+    }, true);
+}
+
+/* ============================================================
+ * Ctrl+滚轮缩放视图
+ * ============================================================ */
+const ZOOM_SEQUENCE = ['details', 'content', 'list', 'small', 'medium', 'large', 'xlarge'];
+
+function initCtrlWheelZoom() {
+    const list = document.getElementById('fileList');
+    if (!list) return;
+    list.addEventListener('wheel', e => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const current = getViewMode();
+        let idx = ZOOM_SEQUENCE.indexOf(current);
+        if (idx < 0) idx = 0;
+        if (e.deltaY < 0) idx = Math.min(idx + 1, ZOOM_SEQUENCE.length - 1);
+        else idx = Math.max(idx - 1, 0);
+        const target = ZOOM_SEQUENCE[idx];
+        if (target === current) return;
+        setViewMode(target);
+        renderFileList();
+    }, { passive: false });
 }

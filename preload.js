@@ -30,5 +30,20 @@ contextBridge.exposeInMainWorld('shareboxAPI', {
                 try { cb(filePath); } catch (err) { console.warn('upload-request cb error', err); }
             });
         }
+    },
+
+    paths: {
+        getDataDir: () => ipcRenderer.invoke('paths:getDataDir'),
+        getDefaultDataDir: () => ipcRenderer.invoke('paths:getDefaultDataDir'),
+        pickDataDir: () => ipcRenderer.invoke('paths:pickDataDir'),
+        setDataDir: (dir) => ipcRenderer.invoke('paths:setDataDir', dir),
+
+        getCacheDir: () => ipcRenderer.invoke('paths:getCacheDir'),
+        getDefaultCacheDir: () => ipcRenderer.invoke('paths:getDefaultCacheDir'),
+        pickCacheDir: () => ipcRenderer.invoke('paths:pickCacheDir'),
+        setCacheDir: (dir) => ipcRenderer.invoke('paths:setCacheDir', dir),
+
+        resetDefaults: () => ipcRenderer.invoke('paths:resetDefaults'),
+        restart: () => ipcRenderer.invoke('paths:restart')
     }
 });

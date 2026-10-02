@@ -567,6 +567,31 @@ function initKeyboardShortcuts() {
 
         const sel = getSelectedItem();
 
+        // 快速访问项：Enter 进入
+        const _quickEl = document.querySelector('#fileList .quick-item.selected');
+        if (_quickEl && e.key === 'Enter') {
+            e.preventDefault();
+            const _qt = _quickEl.dataset.quick;
+            if (_qt === 'favorites') setView('favorites');
+            else if (_qt === 'all') { setView('path'); setCurrentPath([]); }
+            else if (_qt === 'shared') { setView('path'); setCurrentPath(['文件']); }
+            if (getSearchQuery()) {
+                setSearchQuery('');
+                const si = document.getElementById('searchInput');
+                if (si) si.value = '';
+            }
+            renderExplorer();
+            updateActiveTabTitle();
+            return;
+        }
+        // 收藏夹项：Enter 打开
+        const _favEl = document.querySelector('#fileList .fav-item.selected');
+        if (_favEl && e.key === 'Enter') {
+            e.preventDefault();
+            openFavoriteItem(_favEl);
+            return;
+        }
+
         if (e.ctrlKey && !e.shiftKey && !e.altKey) {
             const k = e.key.toLowerCase();
 
@@ -608,7 +633,55 @@ function initKeyboardShortcuts() {
         } else if (e.key === 'F2') {
             if (sel) { e.preventDefault(); renameSelected(); }
         } else if (e.key === 'Escape') {
-            hideContextMenu();
+            // 右键菜单开着 → 只关菜单，不做其他
+            const _menu = document.getElementById('contextMenu');
+            if (_menu && _menu.classList.contains('show')) {
+                e.preventDefault();
+                hideContextMenu();
+                return;
+            }
+            // 1. 搜索态 → 清搜索
+            if (getSearchQuery()) {
+                e.preventDefault();
+                setSearchQuery('');
+                const si = document.getElementById('searchInput');
+                if (si) si.value = '';
+                const cb = document.getElementById('searchClear');
+                if (cb) cb.classList.remove('show');
+                renderFileList();
+                return;
+            }
+            // 2. 快速访问 → 不做
+            const _v = getView();
+            if (_v === 'quick') return;
+            // 3. 返回上一级
+            e.preventDefault();
+            if (_v === 'favorites') {
+                setView('quick');
+            } else {
+                const _cp = getCurrentPath();
+                if (_cp.length === 0) {
+                    setView('quick');
+                } else {
+                    _cp.pop();
+                    setCurrentPath(_cp);
+                }
+            }
+            renderExplorer();
+            updateActiveTabTitle();
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            if (getSearchQuery()) {
+                setSearchQuery('');
+                const si = document.getElementById('searchInput');
+                if (si) si.value = '';
+                const cb = document.getElementById('searchClear');
+                if (cb) cb.classList.remove('show');
+            }
+            setView('quick');
+            setCurrentPath([]);
+            renderExplorer();
+            updateActiveTabTitle();
         }
     });
 }
@@ -708,4 +781,151 @@ function startInlineRename(itemEl) {
     input.addEventListener('click', e => e.stopPropagation());
     input.addEventListener('dblclick', e => e.stopPropagation());
     input.addEventListener('contextmenu', e => e.stopPropagation());
+}
+
+
+/* ============================================================
+ * 批量下载：逐个 / 打包
+ * ============================================================ */
+
+/** 逐个下载选中项（仅文件，文件夹跳过） */
+async function downloadSelectedIndividual(sels) {
+    if (!sels || !sels.length) return;
+
+    const files = sels.filter(s => s.type === 'file');
+    const folders = sels.filter(s => s.type === 'folder');
+
+    if (!files.length) {
+        await dlgAlert('提示', '选中项里没有文件（文件夹请用"打包下载"）');
+        return;
+    }
+
+    const msg = folders.length
+        ? `将逐个下载 ${files.length} 个文件，跳过 ${folders.length} 个文件夹。\n\n继续？`
+        : `将逐个下载 ${files.length} 个文件。\n\n继续？`;
+    const ok = await dlgConfirm('逐个下载', msg);
+    if (!ok) return;
+
+    showToast(`开始下载 ${files.length} 个文件`, 'info');
+    let okCount = 0, failCount = 0;
+
+    for (const sel of files) {
+        const f = findFileByStoragePath(sel.path);
+        if (!f) { failCount++; continue; }
+        try {
+            const res = await fetch(f.file_url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = f.displayName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            okCount++;
+        } catch (e) {
+            console.error('下载失败', f.displayName, e);
+            failCount++;
+        }
+        // 间隔，避免浏览器连点拦截
+        await new Promise(r => setTimeout(r, 400));
+    }
+
+    if (failCount === 0) {
+        showToast(`已下载 ${okCount} 个文件`, 'success');
+    } else if (okCount === 0) {
+        showToast(`下载失败（${failCount} 个）`, 'error');
+    } else {
+        showToast(`完成 ${okCount} 个，失败 ${failCount} 个`, 'error');
+    }
+}
+
+/** 打包下载选中项（文件 + 文件夹混选，文件夹递归展开） */
+async function downloadSelectedZip(sels) {
+    if (!sels || !sels.length) return;
+
+    const ok = await dlgConfirm('打包下载', `将选中的 ${sels.length} 项打包成 ZIP 下载。\n\n文件多时可能较慢。继续？`);
+    if (!ok) return;
+
+    const { data: allFiles, error } = await sb.from('file_list').select('*');
+    if (error) { await dlgAlert('查询失败', error.message); return; }
+
+    const currentPath = getCurrentPath();
+    const targetFiles = [];
+
+    for (const sel of sels) {
+        if (sel.type === 'file') {
+            const f = findFileByStoragePath(sel.path);
+            if (!f) continue;
+            targetFiles.push({ name: f.displayName, url: f.file_url });
+        } else {
+            const folderPrefix = buildFullPath(currentPath, sel.name);
+            const prefix1 = folderPrefix + '/';
+            const prefix2 = '/' + folderPrefix + '/';
+            const rows = allFiles.filter(r => {
+                const n = r.file_name || '';
+                return n.startsWith(prefix1) || n.startsWith(prefix2);
+            });
+            for (const row of rows) {
+                const displayPath = String(row.file_name).replace(/^\/+/, '');
+                targetFiles.push({ name: displayPath, url: row.file_url });
+            }
+        }
+    }
+
+    if (!targetFiles.length) {
+        await dlgAlert('提示', '选中项里没有文件');
+        return;
+    }
+
+    const total = targetFiles.length;
+    let finished = 0;
+    const startTs = performance.now();
+    let rafId = null;
+    let isDone = false;
+
+    function renderLoop() {
+        if (isDone) return;
+        rafId = requestAnimationFrame(renderLoop);
+        const costMs = performance.now() - startTs;
+        let estimateText = '预计剩余 计算中…';
+        if (finished > 0 && costMs > 0) {
+            estimateText = formatMs((total - finished) / (finished / costMs));
+        }
+        updateProgress(total, finished, 'downloadZip', estimateText);
+    }
+    rafId = requestAnimationFrame(renderLoop);
+
+    const zip = new JSZip();
+    for (const f of targetFiles) {
+        try {
+            const res = await fetch(f.url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            zip.file(f.name.replace(/^\/+/, ''), blob);
+        } catch (e) {
+            console.error('拉取失败', f.name, e);
+        }
+        finished++;
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const folderName = currentPath.length ? currentPath[currentPath.length - 1] : 'sharebox';
+    const zipName = `${folderName}_已选${total}项.zip`;
+
+    const a = document.createElement('a');
+    a.href = zipUrl;
+    a.download = zipName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(zipUrl);
+
+    isDone = true;
+    cancelAnimationFrame(rafId);
+    updateProgress(total, finished, 'downloadZip');
+    showToast(`打包完成（${total} 个文件）`, 'success');
 }

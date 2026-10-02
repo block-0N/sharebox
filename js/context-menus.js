@@ -194,6 +194,9 @@ function buildMenuItemsForMulti(sels) {
     items.push({ label: `已选 ${n} 项`, disabled: true });
     items.push({ label: `属性`, action: () => showPropertiesForMulti(sels) });
     items.push({ sep: true });
+    items.push({ label: `逐个下载 ${n} 项`, action: () => downloadSelectedIndividual(sels) });
+    items.push({ label: `打包下载 ${n} 项`, action: () => downloadSelectedZip(sels) });
+    items.push({ sep: true });
     items.push({ label: `复制 ${n} 项`, shortcut: 'Ctrl+C', action: () => copySelection(false) });
     items.push({ label: `剪切 ${n} 项`, shortcut: 'Ctrl+X', action: () => copySelection(true) });
     items.push({ sep: true });
@@ -228,7 +231,7 @@ function buildMenuItemsForBlank() {
     const view = getView();
     const items = [];
 
-    // 只有真实目录视图才允许新建/粘贴/排序
+    // 新建 / 粘贴：仅 path 视图
     if (view === 'path') {
         items.push({ label: '新建文件', action: createNewFile });
         items.push({ label: '新建文件夹', action: createNewFolder });
@@ -240,7 +243,10 @@ function buildMenuItemsForBlank() {
             action: pasteHere
         });
         items.push({ sep: true });
+    }
 
+    // 排序：path 和 favorites 都支持
+    if (view === 'path' || view === 'favorites') {
         const SORT_OPTIONS = [
             { key: 'name', label: '名称' },
             { key: 'size', label: '大小' },
@@ -266,24 +272,26 @@ function buildMenuItemsForBlank() {
                 };
             })
         });
-
         items.push({ sep: true });
     }
 
-    const currentMode = getViewMode();
-    items.push({
-        label: '查看',
-        children: VIEW_MODES.map(m => ({
-            label: m.label,
-            shortcut: currentMode === m.key ? '●' : '',
-            action: () => {
-                setViewMode(m.key);
-                renderFileList();
-            }
-        }))
-    });
+    // 查看：除 quick 外都支持
+    if (view !== 'quick') {
+        const currentMode = getViewMode();
+        items.push({
+            label: '查看',
+            children: VIEW_MODES.map(m => ({
+                label: m.label,
+                shortcut: currentMode === m.key ? '●' : '',
+                action: () => {
+                    setViewMode(m.key);
+                    renderFileList();
+                }
+            }))
+        });
+        items.push({ sep: true });
+    }
 
-    items.push({ sep: true });
     items.push({ label: '刷新', action: () => loadFiles() });
     return items;
 }

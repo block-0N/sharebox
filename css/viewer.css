@@ -432,3 +432,31 @@
     color: #94a3b8;
     font-size: 14px;
 }
+/* ---------- 图片预览：加载提示 ---------- */
+.viewer-img-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    height: 100%;
+    width: 100%;
+}
+
+.viewer-loading-tip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #94a3b8;
+    font-size: 13px;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+
+body.dark .viewer-loading-tip {
+    background: rgba(15, 23, 42, 0.8);
+    color: #64748b;
+}

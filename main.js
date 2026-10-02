@@ -6,6 +6,54 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
+/* ============================================================
+ * bootstrap.json（跨平台存储配置）
+ * 位置：appData 目录下（固定位置，不受 userData 变动影响）
+ *   Windows: %APPDATA%\sharebox-bootstrap.json
+ *   macOS:   ~/Library/Application Support/sharebox-bootstrap.json
+ *   Linux:   ~/.config/sharebox-bootstrap.json
+ * ============================================================ */
+function getBootstrapPath() {
+    return path.join(app.getPath('appData'), 'sharebox-bootstrap.json');
+}
+
+function loadBootstrap() {
+    try {
+        const p = getBootstrapPath();
+        if (!fs.existsSync(p)) return {};
+        return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+    } catch (e) {
+        console.warn('读取 bootstrap.json 失败:', e.message);
+        return {};
+    }
+}
+
+function saveBootstrap(obj) {
+    const p = getBootstrapPath();
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(obj, null, 2), 'utf8');
+}
+
+// ★ 在 app.whenReady() 之前设置路径
+(function applyBootstrapPaths() {
+    try {
+        const cfg = loadBootstrap();
+        if (cfg.userDataPath && fs.existsSync(cfg.userDataPath)) {
+            app.setPath('userData', cfg.userDataPath);
+            console.log('[bootstrap] userData →', cfg.userDataPath);
+        }
+        if (cfg.cacheDir) {
+            if (!fs.existsSync(cfg.cacheDir)) {
+                try { fs.mkdirSync(cfg.cacheDir, { recursive: true }); } catch (e) {}
+            }
+            app.commandLine.appendSwitch('disk-cache-dir', cfg.cacheDir);
+            console.log('[bootstrap] cacheDir →', cfg.cacheDir);
+        }
+    } catch (e) {
+        console.warn('[bootstrap] 应用失败:', e.message);
+    }
+})();
 const PORT = 51234;
 
 const MIME = {
@@ -497,6 +545,7 @@ app.whenReady().then(() => {
     initCustomIcons();
     initContextMenuIPC();
     initIconsDirIPC();
+    initPathsIPC();
 });
 
 app.on('window-all-closed', () => {
@@ -613,5 +662,172 @@ function initIconsDirIPC() {
         await broadcastCustomIcons();
 
         return { success: true, migrated, skipped, dir: newDirAbs };
+    });
+}
+
+
+/* ============================================================
+ * 数据目录 / 缓存目录 管理
+ * ============================================================ */
+
+/** 递归复制目录（同名跳过，跳过锁文件） */
+function copyDirRecursive(src, dst, skipNames) {
+    const skip = new Set(skipNames || []);
+    let copied = 0, skipped = 0, failed = 0;
+
+    function walk(cur, rel) {
+        const entries = fs.readdirSync(cur, { withFileTypes: true });
+        for (const ent of entries) {
+            if (skip.has(ent.name)) { skipped++; continue; }
+            const srcPath = path.join(cur, ent.name);
+            const relPath = rel ? path.join(rel, ent.name) : ent.name;
+            const dstPath = path.join(dst, relPath);
+            if (ent.isDirectory()) {
+                if (!fs.existsSync(dstPath)) fs.mkdirSync(dstPath, { recursive: true });
+                walk(srcPath, relPath);
+            } else if (ent.isFile()) {
+                if (fs.existsSync(dstPath)) { skipped++; continue; }
+                try {
+                    fs.copyFileSync(srcPath, dstPath);
+                    copied++;
+                } catch (e) {
+                    failed++;
+                    console.warn('复制失败', srcPath, e.message);
+                }
+            }
+        }
+    }
+
+    walk(src, '');
+    return { copied, skipped, failed };
+}
+
+/** 统计目录里的文件数 */
+function countFiles(dir) {
+    let n = 0;
+    try {
+        if (!fs.existsSync(dir)) return 0;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const ent of entries) {
+            if (ent.isDirectory()) n += countFiles(path.join(dir, ent.name));
+            else n++;
+        }
+    } catch (e) {}
+    return n;
+}
+
+/** 需要跳过的锁文件/临时文件（复制时会失败） */
+const SKIP_COPY_NAMES = [
+    'lockfile', 'SingletonLock', 'SingletonSocket', 'SingletonCookie',
+    'Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'ShaderCache',
+    'logs', 'Crashpad'
+];
+
+function initPathsIPC() {
+    // ---------- 数据目录 ----------
+    ipcMain.handle('paths:getDataDir', () => app.getPath('userData'));
+    ipcMain.handle('paths:getDefaultDataDir', () => {
+        // 默认目录（bootstrap 里的 userDataPath 没设置时的位置）
+        return path.join(app.getPath('appData'), 'sharebox');
+    });
+
+    ipcMain.handle('paths:pickDataDir', async () => {
+        const res = await dialog.showOpenDialog(mainWindow, {
+            title: '选择新的数据目录',
+            properties: ['openDirectory', 'createDirectory']
+        });
+        if (res.canceled || !res.filePaths.length) return null;
+        return res.filePaths[0];
+    });
+
+    ipcMain.handle('paths:setDataDir', async (e, newDir) => {
+        if (!newDir || !path.isAbsolute(newDir)) throw new Error('需要绝对路径');
+        const oldDir = app.getPath('userData');
+        const newDirAbs = path.resolve(newDir);
+
+        if (oldDir === newDirAbs) {
+            return { success: true, message: '目录未变化', migrated: 0, skipped: 0 };
+        }
+        if (!fs.existsSync(newDirAbs)) fs.mkdirSync(newDirAbs, { recursive: true });
+
+        // 统计目标目录已有文件（给确认用）
+        const existingCount = countFiles(newDirAbs);
+
+        // 复制旧数据到新目录（跳过临时/锁文件）
+        let result;
+        try {
+            result = copyDirRecursive(oldDir, newDirAbs, SKIP_COPY_NAMES);
+        } catch (err) {
+            return { success: false, message: '复制失败：' + err.message };
+        }
+
+        // 保存 bootstrap（只有复制成功才写）
+        try {
+            const cfg = loadBootstrap();
+            cfg.userDataPath = newDirAbs;
+            saveBootstrap(cfg);
+        } catch (err) {
+            return { success: false, message: '写入配置失败：' + err.message };
+        }
+
+        return {
+            success: true,
+            dir: newDirAbs,
+            migrated: result.copied,
+            skipped: result.skipped,
+            failed: result.failed,
+            existingCount
+        };
+    });
+
+    // ---------- 缓存目录 ----------
+    ipcMain.handle('paths:getCacheDir', () => app.getPath('cache'));
+    ipcMain.handle('paths:getDefaultCacheDir', () => {
+        return path.join(app.getPath('userData'), 'Cache');
+    });
+
+    ipcMain.handle('paths:pickCacheDir', async () => {
+        const res = await dialog.showOpenDialog(mainWindow, {
+            title: '选择新的缓存目录',
+            properties: ['openDirectory', 'createDirectory']
+        });
+        if (res.canceled || !res.filePaths.length) return null;
+        return res.filePaths[0];
+    });
+
+    ipcMain.handle('paths:setCacheDir', async (e, newDir) => {
+        if (!newDir || !path.isAbsolute(newDir)) throw new Error('需要绝对路径');
+        const newDirAbs = path.resolve(newDir);
+        if (!fs.existsSync(newDirAbs)) fs.mkdirSync(newDirAbs, { recursive: true });
+
+        const existingCount = countFiles(newDirAbs);
+        try {
+            const cfg = loadBootstrap();
+            cfg.cacheDir = newDirAbs;
+            saveBootstrap(cfg);
+        } catch (err) {
+            return { success: false, message: '写入配置失败：' + err.message };
+        }
+        return { success: true, dir: newDirAbs, existingCount };
+    });
+
+    // ---------- 恢复默认 ----------
+    ipcMain.handle('paths:resetDefaults', async () => {
+        try {
+            const cfg = loadBootstrap();
+            delete cfg.userDataPath;
+            delete cfg.cacheDir;
+            saveBootstrap(cfg);
+            return { success: true };
+        } catch (err) {
+            return { success: false, message: err.message };
+        }
+    });
+
+    // ---------- 重启 ----------
+    ipcMain.handle('paths:restart', () => {
+        app.relaunch();
+        setTimeout(() => app.exit(0), 100);
+        return { success: true };
     });
 }
