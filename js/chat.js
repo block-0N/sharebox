@@ -106,7 +106,7 @@ function renderMsg(list) {
  */
 async function sendMsg() {
     const input = document.getElementById("msgInput");
-    const name = document.getElementById("userName").value || "匿名";
+    const name = getUsername();
     const content = input.value.trim();
     if (!content) return;
     const { error } = await sb.from("messages").insert({ username: name, content });

@@ -264,6 +264,28 @@
         const toggleBtn = document.getElementById('btnToggleCtx');
         if (toggleBtn) toggleBtn.addEventListener('click', toggleCtx);
 
+        const saveUsernameBtn = document.getElementById('btnSaveUsername');
+        if (saveUsernameBtn) {
+            saveUsernameBtn.addEventListener('click', () => {
+                const input = document.getElementById('settingsUsername');
+                if (!input) return;
+                const n = setUsername(input.value);
+                input.value = n;
+                showToast(`用户名已保存：${n}`, 'success');
+            });
+        }
+
+        const settingsUserInput = document.getElementById('settingsUsername');
+        if (settingsUserInput) {
+            settingsUserInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const btn = document.getElementById('btnSaveUsername');
+                    if (btn) btn.click();
+                }
+            });
+        }
+
         const changeDataBtn = document.getElementById('btnChangeDataDir');
         if (changeDataBtn) changeDataBtn.addEventListener('click', changeDataDir);
 

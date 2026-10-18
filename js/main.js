@@ -7,6 +7,8 @@ initThemeToggle();
 initNotifyToggle();
 initTextViewer();
 initChatEvents();
+initUsername();
+initUsernameInput();
 initChatInput();
 initChatToolbar();
 initShare();

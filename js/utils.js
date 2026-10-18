@@ -299,3 +299,47 @@ function initLinkInterceptor() {
         }, 100);
     }, true);
 }
+
+/* ============================================================
+ * 用户名（本地存储，跨会话保留）
+ * ============================================================ */
+const DEFAULT_USERNAME = '匿名用户';
+const USERNAME_KEY = 'sharebox_username';
+
+function getUsername() {
+    const n = safeGetLocal(USERNAME_KEY);
+    return (n && n.trim()) ? n.trim() : DEFAULT_USERNAME;
+}
+
+function setUsername(name) {
+    const raw = String(name || '').trim();
+    const n = raw || DEFAULT_USERNAME;
+    safeSetLocal(USERNAME_KEY, n);
+    // 同步聊天室输入框
+    const chatInput = document.getElementById('userName');
+    if (chatInput && chatInput.value !== n) chatInput.value = n;
+    // 同步设置面板输入框
+    const settingsInput = document.getElementById('settingsUsername');
+    if (settingsInput && settingsInput.value !== n) settingsInput.value = n;
+    return n;
+}
+
+/** 初始化：把存储的用户名填到 UI 上 */
+function initUsername() {
+    const n = getUsername();
+    const chatInput = document.getElementById('userName');
+    if (chatInput) chatInput.value = n;
+    const settingsInput = document.getElementById('settingsUsername');
+    if (settingsInput) settingsInput.value = n;
+}
+
+/** 绑定聊天室昵称输入框的保存逻辑 */
+function initUsernameInput() {
+    const chatInput = document.getElementById('userName');
+    if (!chatInput) return;
+    chatInput.addEventListener('change', () => {
+        const n = setUsername(chatInput.value);
+        chatInput.value = n;
+        showToast('用户名已保存', 'success', 1500);
+    });
+}
