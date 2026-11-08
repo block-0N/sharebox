@@ -4,11 +4,22 @@
 
 /** 当前查看器打开的文件对象 */
 let viewerCurrentFile = null;
+let viewerCurrentText = null;
+let originalText = null;
+let cmEditor = null;
 
 /**
  * 统一入口
  */
 function openPreview(file) {
+    // 统一隐藏编辑按钮（只有 openTextViewer 加载成功后才显示）
+    const _toggleBtn = document.getElementById('viewerToggle');
+    if (_toggleBtn) {
+        _toggleBtn.style.display = 'none';
+        _toggleBtn.textContent = '编辑';
+        _toggleBtn.classList.remove('primary');
+        _toggleBtn.disabled = false;
+    }
     const name = file.displayName || file.file_name || '';
     const ext = getExt(name);
     if (ext === 'html' || ext === 'htm') return openHtmlPreview(file);
@@ -38,26 +49,56 @@ function resetViewer(file, subTitle) {
     content.style.fontSize = '';
     overlay.classList.add('show');
     return content;
+
+    const _toggle = document.getElementById('viewerToggle');
+    if (_toggle) {
+        _toggle.style.display = 'none';
+        _toggle.textContent = '编辑';
+        _toggle.classList.remove('primary');
+        _toggle.disabled = false;
+    }
 }
 
-function closeTextViewer() {
+async function closeTextViewer() {
+    // 编辑中：确认丢弃
+    if (cmEditor) {
+        const changed = cmEditor.getValue() !== originalText;
+        if (changed) {
+            const ok = await dlgConfirm(
+                '放弃修改',
+                '文件正在编辑中，内容未保存。\n\n确定放弃修改并关闭？',
+                true
+            );
+            if (!ok) return;
+        }
+        await exitEditMode(true);
+    }
     document.getElementById('textViewer').classList.remove('show');
     viewerCurrentFile = null;
+    viewerCurrentText = null;
+    originalText = null;
 }
 
 function initTextViewer() {
     const overlay = document.getElementById('textViewer');
-    document.getElementById('viewerClose').addEventListener('click', closeTextViewer);
+    document.getElementById('viewerClose').addEventListener('click', () => closeTextViewer());
+
     document.getElementById('viewerDownload').addEventListener('click', () => {
         if (viewerCurrentFile) {
             downloadFile(viewerCurrentFile.displayName, viewerCurrentFile.file_url);
         }
     });
+
     document.getElementById('viewerCopy').addEventListener('click', async () => {
         const btn = document.getElementById('viewerCopy');
-        const content = document.getElementById('viewerContent').textContent;
+        let textToCopy = '';
+        if (cmEditor) {
+            textToCopy = cmEditor.getValue();
+        } else {
+            textToCopy = document.getElementById('viewerContent').textContent;
+        }
         try {
-            const ok = await copyToClipboard(content);
+            const ok = await copyToClipboard(textToCopy);
             if (!ok) throw new Error('剪贴板写入失败');
             const old = btn.textContent;
             btn.textContent = '已复制';
@@ -67,31 +108,24 @@ function initTextViewer() {
             await dlgAlert('复制失败', '可能浏览器未授予剪贴板权限');
         }
     });
-    document.getElementById('viewerShare').addEventListener('click', async () => {
-        if (!viewerCurrentFile) return;
-        const url = viewerCurrentFile.file_url;
-        if (!url) {
-            await dlgAlert('无法分享', '该文件没有可用的分享链接');
-            return;
-        }
-        try {
-            const ok = await copyToClipboard(url);
-            if (!ok) throw new Error('剪贴板写入失败');
-            const btn = document.getElementById('viewerShare');
-            const old = btn.textContent;
-            btn.textContent = '✓ 已复制';
-            setTimeout(() => { btn.textContent = old; }, 1200);
-            showToast('分享链接已复制到剪贴板', 'success');
-        } catch (err) {
-            console.error('复制分享链接失败', err);
-            await dlgAlert('复制失败', '可能浏览器未授予剪贴板权限');
-        }
-    });
+
+    const toggleBtn = document.getElementById('viewerToggle');
+    if (toggleBtn) toggleBtn.addEventListener('click', toggleEditMode);
+
     overlay.addEventListener('click', e => {
         if (e.target === overlay) closeTextViewer();
     });
+
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && overlay.classList.contains('show')) closeTextViewer();
+        if (cmEditor && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            e.stopPropagation();
+            saveEditedText();
+            return;
+        }
+        if (e.key === 'Escape' && overlay.classList.contains('show')) {
+            closeTextViewer();
+        }
     });
 }
 
@@ -99,8 +133,9 @@ function initTextViewer() {
  * 文本预览
  * ============================================================ */
 
-async function openTextViewer(file) {
+async function openTextViewer(file, forceReload) {
     viewerCurrentFile = file;
+    viewerCurrentText = null;
     const overlay = document.getElementById('textViewer');
     const title = document.getElementById('viewerTitle');
     const content = document.getElementById('viewerContent');
@@ -110,12 +145,14 @@ async function openTextViewer(file) {
     content.textContent = '加载中…';
     overlay.classList.add('show');
 
+    const toggleBtn = document.getElementById('viewerToggle');
+    if (toggleBtn) { toggleBtn.style.display = 'none'; toggleBtn.textContent = '编辑'; toggleBtn.disabled = false; }
     try {
-        const res = await fetch(file.file_url);
+        const url = forceReload ? (file.file_url + '?t=' + Date.now()) : file.file_url;
+        const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const buf = await res.arrayBuffer();
 
-        // UTF-8 → GBK 兜底
         let text;
         try {
             text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
@@ -124,23 +161,138 @@ async function openTextViewer(file) {
             catch (e2) { text = new TextDecoder('utf-8', { fatal: false }).decode(buf); }
         }
 
+        viewerCurrentText = text;
+
         if (text.length > 500 * 1024) {
             content.textContent = text + '\n\n[文件较大，未进行语法高亮]';
             return;
         }
 
-        const lang = detectLang(file.displayName);
-        let result;
-        if (lang && window.hljs.getLanguage(lang)) {
-            result = window.hljs.highlight(text, { language: lang, ignoreIllegals: true });
-        } else {
-            result = window.hljs.highlightAuto(text);
-        }
-        content.innerHTML = result.value;
-        content.classList.add('hljs');
+        renderTextPreviewContent(content, text, file.displayName);
+
+        if (toggleBtn) toggleBtn.style.display = '';
     } catch (err) {
         console.error('读取文件失败', err);
         content.textContent = '加载失败：' + err.message;
+    }
+}
+/* ============================================================
+ * 文本预览渲染（抽出，供预览和保存后重渲染用）
+ * ============================================================ */
+function renderTextPreviewContent(content, text, filename) {
+    if (text.length > 500 * 1024) {
+        content.textContent = text + '\n\n[文件较大，未进行语法高亮]';
+        return;
+    }
+    const lang = detectLang(filename);
+    let result;
+    if (lang && window.hljs && window.hljs.getLanguage(lang)) {
+        result = window.hljs.highlight(text, { language: lang, ignoreIllegals: true });
+    } else if (window.hljs) {
+        result = window.hljs.highlightAuto(text);
+    } else {
+        content.textContent = text;
+        return;
+    }
+    content.innerHTML = result.value;
+    content.classList.add('hljs');
+}
+
+/* ============================================================
+ * 编辑模式：进入 / 退出
+ * ============================================================ */
+function cmModeOf(filename) {
+    const ext = getExt(filename);
+    const map = {
+        js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript',
+        ts: 'javascript', tsx: 'javascript',
+        json: 'application/json', json5: 'application/json',
+        html: 'htmlmixed', htm: 'htmlmixed', xhtml: 'htmlmixed',
+        vue: 'htmlmixed', svelte: 'htmlmixed',
+        xml: 'xml', svg: 'xml',
+        css: 'css', scss: 'css', less: 'css',
+        md: 'markdown', markdown: 'markdown',
+        py: 'python',
+        sh: 'shell', bash: 'shell', zsh: 'shell',
+        c: 'text/x-csrc', h: 'text/x-csrc',
+        cpp: 'text/x-c++src', hpp: 'text/x-c++src', cc: 'text/x-c++src',
+        java: 'text/x-java', cs: 'text/x-csharp',
+        go: 'text/x-go', rs: 'text/x-rustsrc',
+        sql: 'sql',
+        yaml: 'yaml', yml: 'yaml',
+        toml: 'toml', ini: 'properties'
+    };
+    return map[ext] || null;
+}
+
+function enterEditMode() {
+    if (!viewerCurrentText) return;
+    if (!window.CodeMirror) {
+        showToast('编辑器未加载', 'error');
+        return;
+    }
+
+    const content = document.getElementById('viewerContent');
+    const toggleBtn = document.getElementById('viewerToggle');
+
+    originalText = viewerCurrentText;
+    content.innerHTML = '';
+    content.className = 'viewer-content viewer-editor';
+    content.classList.remove('hljs');
+
+    const textarea = document.createElement('textarea');
+    textarea.id = 'cmTextarea';
+    content.appendChild(textarea);
+
+    const mode = cmModeOf(viewerCurrentFile.displayName || '');
+    cmEditor = window.CodeMirror.fromTextArea(textarea, {
+        lineNumbers: true,
+        mode: mode,
+        theme: 'default',
+        lineWrapping: true,
+        indentUnit: 4,
+        tabSize: 4,
+        viewportMargin: Infinity
+    });
+    cmEditor.setValue(originalText);
+    setTimeout(() => cmEditor.refresh(), 50);
+
+    if (toggleBtn) {
+        toggleBtn.textContent = '锁定';
+        toggleBtn.classList.add('primary');
+    }
+}
+
+async function exitEditMode(discard) {
+    if (!cmEditor) return;
+    const content = document.getElementById('viewerContent');
+
+    try { cmEditor.toTextArea(); } catch (e) {}
+    cmEditor = null;
+
+    if (discard) {
+        content.className = 'viewer-content';
+        content.innerHTML = '';
+        renderTextPreviewContent(content, originalText, viewerCurrentFile.displayName || '');
+        viewerCurrentText = originalText;
+    }
+    originalText = null;
+}
+async function toggleEditMode() {
+    const toggleBtn = document.getElementById('viewerToggle');
+
+    if (cmEditor) {
+        // 正在编辑 → 尝试保存（等价 Ctrl+S）
+        await saveEditedText();
+        // saveEditedText 成功会调 exitEditMode(false) 并恢复按钮
+        return;
+    }
+
+    // 未编辑 → 进入编辑
+    enterEditMode();
+    if (toggleBtn) {
+        toggleBtn.textContent = '锁定';
+        toggleBtn.classList.add('primary');
     }
 }
 
@@ -558,4 +710,129 @@ function renderHexDump(bytes) {
     }
 
     return `<div class="hex-viewer">${lines.join('')}</div>`;
+}
+
+
+/* ============================================================
+ * 不可见字符检测
+ * ============================================================ */
+function detectInvisibleChars(text) {
+    if (!text) return [];
+    const patterns = [
+        { re: /\u200b/g, name: '零宽空格 (U+200B)' },
+        { re: /\u200c/g, name: '零宽非连接符 (U+200C)' },
+        { re: /\u200d/g, name: '零宽连接符 (U+200D)' },
+        { re: /\ufeff/g, name: 'BOM (U+FEFF)' },
+        { re: /\u00a0/g, name: '不换行空格 (U+00A0)' },
+        { re: /\u200e/g, name: '左至右标记 (U+200E)' },
+        { re: /\u200f/g, name: '右至左标记 (U+200F)' },
+        { re: /\u202a/g, name: '左至右嵌入 (U+202A)' },
+        { re: /\u202c/g, name: '弹出格式 (U+202C)' },
+        { re: /\u2060/g, name: '词连接符 (U+2060)' },
+        { re: /\u0000/g, name: '空字符 (U+0000)' }
+    ];
+    const found = [];
+    for (const p of patterns) {
+        const m = text.match(p.re);
+        if (m) found.push(`${p.name} × ${m.length}`);
+    }
+    return found;
+}
+
+/* ============================================================
+ * 保存编辑后的文本
+ * ============================================================ */
+async function saveEditedText() {
+    if (!cmEditor || !viewerCurrentFile) return;
+    const newText = cmEditor.getValue();
+    const toggleBtn = document.getElementById('viewerToggle');
+
+    // 1. 不可见字符检测
+    const invis = detectInvisibleChars(newText);
+    if (invis.length > 0) {
+        const ok = await dlgConfirm(
+            '检测到不可见字符',
+            `文件中包含以下不可见字符：\n\n${invis.join('\n')}\n\n` +
+            `继续保存可能影响文件内容。\n\n是否继续？`,
+            true
+        );
+        if (!ok) return;
+    }
+
+    // 2. 无变化 → 直接退出编辑
+    if (newText === originalText) {
+        await exitEditMode(false);
+        const content = document.getElementById('viewerContent');
+        content.className = 'viewer-content';
+        content.innerHTML = '';
+        renderTextPreviewContent(content, newText, viewerCurrentFile.displayName || '');
+        if (toggleBtn) {
+            toggleBtn.textContent = '编辑';
+            toggleBtn.classList.remove('primary');
+        }
+        showToast('内容未变化', 'info');
+        return;
+    }
+
+    // 3. 乐观锁
+    const storagePath = viewerCurrentFile.storage_path;
+    if (storagePath) {
+        try {
+            const { data: listData } = await sb.storage
+                .from('public_netdisk')
+                .list('', { search: storagePath, limit: 10 });
+            const remote = (listData || []).find(o => o.name === storagePath);
+            if (remote) {
+                const remoteTime = remote.updated_at || remote.created_at;
+                const localTime = viewerCurrentFile._mtime;
+                if (localTime && remoteTime && new Date(remoteTime) > new Date(localTime)) {
+                    const ok = await dlgConfirm(
+                        '文件已被他人修改',
+                        '该文件在你打开后已被修改。\n\n覆盖后对方的改动会丢失。\n\n是否覆盖？',
+                        true
+                    );
+                    if (!ok) return;
+                }
+            }
+        } catch (e) {
+            console.warn('乐观锁检查失败', e);
+        }
+    }
+
+    // 4. 上传
+    if (toggleBtn) { toggleBtn.disabled = true; toggleBtn.textContent = '保存中…'; }
+
+    try {
+        const blob = new Blob([newText], { type: 'text/plain; charset=utf-8' });
+        const { error } = await sb.storage
+            .from('public_netdisk')
+            .upload(storagePath, blob, { upsert: true, contentType: 'text/plain; charset=utf-8' });
+        if (error) throw error;
+
+        viewerCurrentFile._mtime = new Date().toISOString();
+        viewerCurrentText = newText;
+
+        await exitEditMode(false);
+        const content = document.getElementById('viewerContent');
+        content.className = 'viewer-content';
+        content.innerHTML = '';
+        renderTextPreviewContent(content, newText, viewerCurrentFile.displayName || '');
+
+        if (toggleBtn) {
+            toggleBtn.disabled = false;
+            toggleBtn.textContent = '编辑';
+            toggleBtn.classList.remove('primary');
+        }
+        showToast('已保存', 'success');
+
+        if (typeof loadFiles === 'function') {
+            setTimeout(() => loadFiles(true), 500);
+        }
+    } catch (e) {
+        if (toggleBtn) {
+            toggleBtn.disabled = false;
+            toggleBtn.textContent = '锁定';
+        }
+        await dlgAlert('保存失败', e.message || String(e));
+    }
 }
